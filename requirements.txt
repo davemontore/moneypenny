@@ -1,0 +1,6 @@
+pyaudio
+keyboard
+requests
+cryptography
+win10toast
+psutil
