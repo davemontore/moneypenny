@@ -1,5 +1,41 @@
 # Voice Typing App - Changelog
 
+## Version 2.1.0 - CustomTkinter Modernization & Critical Fixes
+*Released: December 2024*
+
+### 🎨 **Complete UI Modernization**
+- **CustomTkinter upgrade**: Migrated from traditional Tkinter to modern CustomTkinter framework
+- **Flat design**: Removed all dark gray frames for clean, unified background
+- **Modern typography**: Montserrat/Roboto font pairing with proper hierarchy
+- **Elegant layout**: Hero section with large title, clean spacing, minimal buttons
+- **Professional appearance**: No emojis, sleek borders, contemporary styling
+
+### 🔧 **Critical Bug Fixes**
+- **Microphone dropdown fixed**: Resolved data type mismatch preventing dropdown rendering
+- **Transcription API fixed**: Corrected content-type headers (was sending `application/json` for binary data)
+- **Hotkey system repaired**: Fixed key suppression preventing normal typing
+- **Settings persistence**: All settings now save permanently between sessions
+
+### ✨ **Enhanced Features**
+- **Built-in test area**: Added text box under Test button for immediate transcription preview
+- **Improved error handling**: Detailed API error messages with response details
+- **Better audio debugging**: Enhanced logging for microphone and recording issues
+- **Smart transcription routing**: Test mode shows results in app, hotkey mode types to external apps
+
+### 🎯 **User Experience Improvements**
+- **Simplified interface**: "Test Recording" → "Test", cleaner button hierarchy
+- **Consistent theming**: Cream (#F7F5F3) and charcoal (#2C2C2C) throughout
+- **Modern dialogs**: Settings and vocabulary windows match main app styling
+- **Responsive design**: Proper button sizing and spacing
+
+### 🐛 **Technical Fixes**
+- **API headers corrected**: Separate headers for file upload vs JSON requests
+- **Data formatting fixed**: Microphone dropdown now receives strings instead of objects
+- **Keyboard suppression**: Only suppress exact hotkey combinations, not individual keys
+- **Memory management**: Improved widget cleanup and resource handling
+
+---
+
 ## Version 2.0.0 - Major Architecture & UI Overhaul
 *Released: December 2024*
 

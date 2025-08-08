@@ -4,3 +4,4 @@ requests
 cryptography
 win10toast
 psutil
+customtkinter

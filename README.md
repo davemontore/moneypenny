@@ -54,16 +54,10 @@
 
 ### Alternative Launch Methods
 
-**Windows Batch File:**
+**Easy Windows Launch:**
 ```bash
-# Double-click to run without terminal
-run_voice_typing.bat
-```
-
-**Background Launch (PowerShell):**
-```powershell
-# Run hidden in background
-./run_voice_typing.ps1
+# Double-click this file to run the app
+MoneyPenny Voice Typing.bat
 ```
 
 ## 🎯 How to Use

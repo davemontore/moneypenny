@@ -1,5 +1,6 @@
-import tkinter as tk
+import customtkinter as ctk
 from tkinter import messagebox
+import tkinter as tk  # Keep for some components like messagebox
 import threading
 import time
 import keyboard
@@ -61,11 +62,15 @@ class VoiceTyping:
         self.recording_indicator = None
         self.drag_data = {"x": 0, "y": 0, "dragging": False}
         
+        # Set CustomTkinter appearance - cream/black theme
+        ctk.set_appearance_mode("light")
+        # Create custom cream/black color theme
+        ctk.set_default_color_theme("blue")  # We'll override colors manually
+        
         # GUI setup
-        self.root = tk.Tk()
+        self.root = ctk.CTk()
         self.root.title("Voice Typing")
-        self.root.geometry("600x550")
-        self.root.configure(bg='#F7F5F3')
+        self.root.geometry("650x600")
         self.root.resizable(False, False)
         
         # Set up system tray behavior
@@ -547,420 +552,313 @@ class VoiceTyping:
         return False
     
     def setup_gui(self):
-        """Create the modern graphical user interface"""
-        # Configure main window with cream background
-        self.root.configure(bg='#F7F5F3')
+        """Create the modern flat graphical user interface with CustomTkinter"""
+        # Set window background to cream color
+        self.root.configure(fg_color="#F7F5F3")
         
-        # Main container with padding
-        main_frame = tk.Frame(self.root, bg='#F7F5F3')
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=40, pady=30)
+        # Create main container without frame (flat design)
+        main_container = ctk.CTkFrame(self.root, fg_color="transparent")
+        main_container.pack(fill="both", expand=True, padx=40, pady=40)
         
-        # Title with modern styling and improved font fallback
-        # Try multiple modern fonts in order of preference
-        title_font = None
-        for font_family in ["Montserrat", "Segoe UI", "Helvetica", "Arial"]:
-            try:
-                test_font = (font_family, 28, "bold")
-                test_label = tk.Label(main_frame, font=test_font)
-                test_label.destroy()
-                title_font = test_font
-                print(f"Using title font: {font_family}")
-                break
-            except:
-                continue
+        # Modern hero section
+        hero_frame = ctk.CTkFrame(main_container, fg_color="transparent")
+        hero_frame.pack(pady=(0, 30))
         
-        if not title_font:
-            title_font = ("TkDefaultFont", 28, "bold")  # Ultimate fallback
-        
-        title_label = tk.Label(
-            main_frame, 
-            text="Voice Typing", 
-            font=title_font,
-            bg='#F7F5F3',
-            fg='#2C2C2C'
+        # Large modern title with Montserrat
+        title_label = ctk.CTkLabel(
+            hero_frame,
+            text="Voice Typing",
+            font=ctk.CTkFont(family="Montserrat", size=42, weight="bold"),
+            text_color="#2C2C2C"
         )
         title_label.pack(pady=(0, 8))
         
-        # Subtitle with improved font fallback
-        subtitle_font = None
-        for font_family in ["Roboto", "Segoe UI", "Helvetica", "Arial"]:
-            try:
-                test_font = (font_family, 14)
-                test_label = tk.Label(main_frame, font=test_font)
-                test_label.destroy()
-                subtitle_font = test_font
-                print(f"Using subtitle font: {font_family}")
-                break
-            except:
-                continue
-        
-        if not subtitle_font:
-            subtitle_font = ("TkDefaultFont", 14)  # Ultimate fallback
-        
-        subtitle_label = tk.Label(
-            main_frame,
-            text="Type with your voice in any application",
-            font=subtitle_font,
-            bg='#F7F5F3',
-            fg='#2C2C2C'
+        # Elegant subtitle with Roboto
+        subtitle_label = ctk.CTkLabel(
+            hero_frame,
+            text="Transform speech into text instantly",
+            font=ctk.CTkFont(family="Roboto", size=16),
+            text_color="#666666"
         )
-        subtitle_label.pack(pady=(0, 40))
+        subtitle_label.pack(pady=(0, 25))
         
         # Status indicator with modern styling
-        status_frame = tk.Frame(main_frame, bg='#F7F5F3')
-        status_frame.pack(fill=tk.X, pady=(0, 30))
+        status_frame = ctk.CTkFrame(main_container, fg_color="transparent")
+        status_frame.pack(pady=(0, 25))
         
-        self.status_label = tk.Label(
+        self.status_label = ctk.CTkLabel(
             status_frame,
             text="Ready to voice type",
-            font=("Roboto", 16, "bold"),
-            bg='#F7F5F3',
-            fg='#2C2C2C'
+            font=ctk.CTkFont(family="Montserrat", size=18, weight="bold"),
+            text_color="#2C2C2C"
         )
         self.status_label.pack()
         
-        # Instructions frame
-        instructions_frame = tk.Frame(main_frame, bg='#F7F5F3')
-        instructions_frame.pack(fill=tk.X, pady=(0, 30))
-        
-        # Hotkey instruction
-        self.hotkey_label = tk.Label(
-            instructions_frame,
-            text=f"Hold {self.record_hotkey.upper()} to record voice",
-            font=("Roboto", 14, "bold"),
-            bg='#F7F5F3',
-            fg='#2C2C2C'
+        # Clean hotkey instruction (no frame)
+        self.hotkey_label = ctk.CTkLabel(
+            main_container,
+            text=f"Hold {self.record_hotkey.upper()} to start recording",
+            font=ctk.CTkFont(family="Roboto", size=14, weight="bold"),
+            text_color="#2C2C2C"
         )
-        self.hotkey_label.pack(pady=(0, 15))
+        self.hotkey_label.pack(pady=(0, 30))
         
-        # Workflow instructions
-        workflow_text = """How to use:
-1. Click in any text field (email, document, etc.)
-2. Hold down Ctrl+Shift+R to start recording
-3. Speak clearly into your microphone
-4. Release Ctrl+Shift+R to stop recording
-5. Your words appear directly in the text field"""
+        # Simplified instructions
+        workflow_text = "Click in any text field • Hold your hotkey and speak • Release to stop and see your text appear"
         
-        workflow_label = tk.Label(
-            instructions_frame,
+        workflow_label = ctk.CTkLabel(
+            main_container,
             text=workflow_text,
-            font=("Roboto", 11),
-            bg='#F7F5F3',
-            fg='#2C2C2C',
-            justify=tk.LEFT,
-            wraplength=450
+            font=ctk.CTkFont(family="Roboto", size=13),
+            text_color="#666666",
+            justify="center"
         )
-        workflow_label.pack()
+        workflow_label.pack(pady=(0, 35))
         
-        # Buttons frame with symmetric layout
-        button_frame = tk.Frame(main_frame, bg='#F7F5F3')
-        button_frame.pack(pady=30)
+        # Modern button layout
+        button_frame = ctk.CTkFrame(main_container, fg_color="transparent")
+        button_frame.pack(pady=20)
         
-        # Create rounded button style
-        button_style = {
-            'font': ("Roboto", 12, "bold"),
-            'bg': '#F7F5F3',
-            'fg': '#2C2C2C',
-            'relief': tk.FLAT,
-            'bd': 2,
-            'padx': 25,
-            'pady': 12,
-            'cursor': 'hand2',
-            'activebackground': '#E8E6E4',
-            'activeforeground': '#2C2C2C',
-            'highlightthickness': 1,
-            'highlightbackground': '#2C2C2C',
-            'highlightcolor': '#2C2C2C'
-        }
-        
-        # Record button
-        self.record_button = tk.Button(
+        # Primary action button (clean, elegant)
+        self.record_button = ctk.CTkButton(
             button_frame,
-            text="Test Recording",
+            text="Test",
             command=self.toggle_recording,
-            **button_style
+            font=ctk.CTkFont(family="Montserrat", size=16, weight="bold"),
+            corner_radius=8,
+            height=50,
+            width=120,
+            fg_color="#2C2C2C",
+            text_color="#F7F5F3",
+            hover_color="#1A1A1A"
         )
-        self.record_button.pack(side=tk.LEFT, padx=8)
+        self.record_button.pack(pady=(0, 15))
         
-        # Settings button
-        settings_button = tk.Button(
+        # Test text box
+        self.test_textbox = ctk.CTkTextbox(
             button_frame,
+            width=400,
+            height=80,
+            font=ctk.CTkFont(family="Roboto", size=12),
+            wrap="word"
+        )
+        self.test_textbox.pack(pady=(0, 20))
+        self.test_textbox.insert("1.0", "Click Test and speak to see your transcribed text appear here...")
+        
+        # Secondary buttons (horizontal layout)
+        secondary_frame = ctk.CTkFrame(button_frame, fg_color="transparent")
+        secondary_frame.pack()
+        
+        # Settings button - minimal design
+        settings_button = ctk.CTkButton(
+            secondary_frame,
             text="Settings",
             command=self.show_settings,
-            **button_style
+            font=ctk.CTkFont(family="Roboto", size=13, weight="normal"),
+            corner_radius=6,
+            height=36,
+            width=120,
+            fg_color="transparent",
+            text_color="#2C2C2C",
+            hover_color="#E8E6E4",
+            border_color="#DDDDDD",
+            border_width=1
         )
-        settings_button.pack(side=tk.LEFT, padx=8)
+        settings_button.pack(side="left", padx=12)
         
-        # Vocabulary Library button
-        vocab_button = tk.Button(
-            button_frame,
+        # Vocabulary button - minimal design
+        vocab_button = ctk.CTkButton(
+            secondary_frame,
             text="Vocabulary",
             command=self.show_vocabulary_library,
-            **button_style
+            font=ctk.CTkFont(family="Roboto", size=13, weight="normal"),
+            corner_radius=6,
+            height=36,
+            width=120,
+            fg_color="transparent",
+            text_color="#2C2C2C",
+            hover_color="#E8E6E4",
+            border_color="#DDDDDD",
+            border_width=1
         )
-        vocab_button.pack(side=tk.LEFT, padx=8)
+        vocab_button.pack(side="left", padx=12)
     
     def show_settings(self):
-        """Show settings dialog"""
-        settings_window = tk.Toplevel(self.root)
+        """Show modern settings dialog with CustomTkinter"""
+        settings_window = ctk.CTkToplevel(self.root)
         settings_window.title("Voice Typing Settings")
-        settings_window.geometry("650x750")
-        settings_window.configure(bg='#F7F5F3')
+        settings_window.geometry("700x600")
         settings_window.resizable(False, False)
         
         # Center the settings window
         settings_window.transient(self.root)
         settings_window.grab_set()
         
-        # Center on screen
-        settings_window.update_idletasks()
-        width = settings_window.winfo_width()
-        height = settings_window.winfo_height()
-        x = (settings_window.winfo_screenwidth() // 2) - (width // 2)
-        y = (settings_window.winfo_screenheight() // 2) - (height // 2)
-        settings_window.geometry(f'{width}x{height}+{x}+{y}')
-        
-        # Main container with scrollbar
-        canvas = tk.Canvas(settings_window, bg='#F7F5F3', highlightthickness=0)
-        scrollbar = tk.Scrollbar(settings_window, orient="vertical", command=canvas.yview)
-        scrollable_frame = tk.Frame(canvas, bg='#F7F5F3')
-        
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        canvas.pack(side="left", fill="both", expand=True, padx=30, pady=30)
-        scrollbar.pack(side="right", fill="y")
-        
-        # Main container
-        main_frame = scrollable_frame
+        # Create main frame (no scrolling needed)
+        main_frame = ctk.CTkFrame(settings_window, corner_radius=10)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
         # Title
-        title_label = tk.Label(
+        title_label = ctk.CTkLabel(
             main_frame,
             text="Settings",
-            font=("Montserrat", 24, "bold"),
-            bg='#F7F5F3',
-            fg='#2C2C2C'
+            font=ctk.CTkFont(family="Montserrat", size=28, weight="bold")
         )
-        title_label.pack(pady=(0, 30))
+        title_label.pack(pady=(0, 20))
         
         # API Key section
-        api_frame = tk.LabelFrame(
+        api_title = ctk.CTkLabel(
             main_frame,
             text="AssemblyAI API Key",
-            font=("Roboto", 14, "bold"),
-            bg='#F7F5F3',
-            fg='#2C2C2C',
-            relief=tk.FLAT,
-            bd=1,
-            padx=20,
-            pady=15
+            font=ctk.CTkFont(family="Montserrat", size=16, weight="bold")
         )
-        api_frame.pack(fill=tk.X, pady=(0, 25))
+        api_title.pack(pady=(0, 10))
         
-        api_label = tk.Label(
-            api_frame,
-            text="Enter your API key:",
-            font=("Roboto", 12),
-            bg='#F7F5F3',
-            fg='#2C2C2C'
+        api_entry = ctk.CTkEntry(
+            main_frame,
+            placeholder_text="Enter your API key here",
+            font=ctk.CTkFont(family="Roboto", size=12),
+            width=400,
+            height=35,
+            show="*"
         )
-        api_label.pack(anchor=tk.W, padx=0, pady=(10, 8))
-        
-        api_entry = tk.Entry(
-            api_frame,
-            font=("Roboto", 12),
-            width=50,
-            show="*",
-            relief=tk.FLAT,
-            bd=1,
-            bg='#FFFFFF',
-            fg='#2C2C2C',
-            insertbackground='#2C2C2C',
-            highlightthickness=1,
-            highlightcolor='#2C2C2C',
-            highlightbackground='#CCCCCC'
-        )
-        api_entry.pack(padx=0, pady=(0, 15), ipady=8)
+        api_entry.pack(pady=(0, 10))
         
         if self.api_key:
+            api_entry.delete(0, "end")
             api_entry.insert(0, self.api_key)
         
-        # Show/Hide button
-        show_button = tk.Button(
-            api_frame,
+        # Button frame for API key buttons
+        api_button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        api_button_frame.pack(pady=(0, 25))
+        
+        show_button = ctk.CTkButton(
+            api_button_frame,
             text="Show/Hide",
             command=lambda: self.toggle_api_visibility(api_entry),
-            font=("Roboto", 10, "bold"),
-            bg='#F7F5F3',
-            fg='#2C2C2C',
-            relief=tk.FLAT,
-            bd=1,
-            padx=15,
-            pady=6,
-            cursor='hand2',
-            activebackground='#E8E6E4',
-            highlightthickness=1,
-            highlightbackground='#2C2C2C'
+            font=ctk.CTkFont(family="Segoe UI", size=12),
+            width=100,
+            height=30,
+            fg_color="#F7F5F3",
+            text_color="#2C2C2C",
+            hover_color="#E8E6E4",
+            border_color="#2C2C2C",
+            border_width=1
         )
-        show_button.pack(pady=(0, 10))
+        show_button.pack(side="left", padx=5)
         
-        # Hotkeys section
-        hotkey_frame = tk.LabelFrame(
+        # SEPARATE SAVE API KEY BUTTON
+        save_api_button = ctk.CTkButton(
+            api_button_frame,
+            text="SAVE API KEY",
+            command=lambda: self.save_api_key_only(api_entry),
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            width=150,
+            height=30,
+            fg_color="#2C2C2C",
+            text_color="#F7F5F3",
+            hover_color="#1A1A1A",
+            border_color="#2C2C2C",
+            border_width=1
+        )
+        save_api_button.pack(side="left", padx=5)
+        
+        # Hotkey section
+        hotkey_title = ctk.CTkLabel(
             main_frame,
-            text="Keyboard Shortcut",
-            font=("Roboto", 14, "bold"),
-            bg='#F7F5F3',
-            fg='#2C2C2C',
-            relief=tk.FLAT,
-            bd=1,
-            padx=20,
-            pady=15
+            text="Recording Hotkey",
+            font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold")
         )
-        hotkey_frame.pack(fill=tk.X, pady=(0, 25))
+        hotkey_title.pack(pady=(20, 10))
         
-        # Record hotkey
-        record_label = tk.Label(
-            hotkey_frame,
-            text="Voice typing hotkey:",
-            font=("Roboto", 12),
-            bg='#F7F5F3',
-            fg='#2C2C2C'
+        hotkey_entry = ctk.CTkEntry(
+            main_frame,
+            placeholder_text="e.g., ctrl+shift+r",
+            font=ctk.CTkFont(family="Segoe UI", size=12),
+            width=400,
+            height=35
         )
-        record_label.pack(anchor=tk.W, padx=0, pady=(10, 8))
-        
-        record_entry = tk.Entry(
-            hotkey_frame,
-            font=("Roboto", 12),
-            width=40,
-            relief=tk.FLAT,
-            bd=1,
-            bg='#FFFFFF',
-            fg='#2C2C2C',
-            insertbackground='#2C2C2C',
-            highlightthickness=1,
-            highlightcolor='#2C2C2C',
-            highlightbackground='#CCCCCC'
-        )
-        record_entry.pack(padx=0, pady=(0, 15), ipady=8)
-        record_entry.insert(0, self.record_hotkey)
+        hotkey_entry.pack(pady=(0, 25))
+        hotkey_entry.insert(0, self.record_hotkey)
         
         # Microphone section
-        mic_frame = tk.LabelFrame(
+        mic_title = ctk.CTkLabel(
             main_frame,
             text="Microphone Selection",
-            font=("Roboto", 14, "bold"),
-            bg='#F7F5F3',
-            fg='#2C2C2C',
-            relief=tk.FLAT,
-            bd=1,
-            padx=20,
-            pady=15
+            font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold")
         )
-        mic_frame.pack(fill=tk.X, pady=(0, 25))
-        
-        mic_label = tk.Label(
-            mic_frame,
-            text="Select your microphone:",
-            font=("Roboto", 12),
-            bg='#F7F5F3',
-            fg='#2C2C2C'
-        )
-        mic_label.pack(anchor=tk.W, padx=0, pady=(10, 8))
+        mic_title.pack(pady=(20, 10))
         
         # Get available microphones
         microphones = self.get_available_microphones()
+        mic_names = []
+        if microphones:
+            mic_names = [f"{mic['index']}: {mic['name']}" for mic in microphones]
+        else:
+            mic_names = ["No microphones detected"]
         
-        # Create microphone dropdown
-        mic_var = tk.StringVar()
-        
-        # Create dropdown options
-        mic_options = [f"{mic['index']}: {mic['name']}" for mic in microphones]
-        if not mic_options:
-            mic_options = ["No microphones found"]
-        
-        # Modern dropdown styling
-        mic_dropdown = tk.OptionMenu(
-            mic_frame,
-            mic_var,
-            *mic_options,
-            command=lambda x: self.on_microphone_selected(x, microphones)
+        mic_dropdown = ctk.CTkOptionMenu(
+            main_frame,
+            values=mic_names,
+            font=ctk.CTkFont(family="Segoe UI", size=12),
+            width=400,
+            height=35,
+            fg_color="#F7F5F3",
+            text_color="#2C2C2C",
+            button_color="#E8E6E4",
+            button_hover_color="#CCCCCC"
         )
-        mic_dropdown.config(
-            font=("Roboto", 11),
-            bg='#FFFFFF',
-            fg='#2C2C2C',
-            relief=tk.FLAT,
-            bd=1,
-            activebackground='#E8E6E4',
-            activeforeground='#2C2C2C',
-            highlightthickness=1,
-            highlightbackground='#CCCCCC',
-            width=45,
-            anchor='w'
-        )
-        # Style the dropdown menu
-        mic_dropdown['menu'].config(
-            bg='#FFFFFF',
-            fg='#2C2C2C',
-            activebackground='#E8E6E4',
-            activeforeground='#2C2C2C',
-            font=("Roboto", 11),
-            bd=0
-        )
-        mic_dropdown.pack(fill=tk.X, pady=(0, 15), ipady=6)
+        mic_dropdown.pack(pady=(0, 25))
         
         # Set current selection
-        if microphones:
-            current_mic = f"{self.selected_microphone}: {next((mic['name'] for mic in microphones if mic['index'] == self.selected_microphone), 'Unknown')}"
-            mic_var.set(current_mic)
-        elif mic_options:
-            mic_var.set(mic_options[0])
-        
-        # Microphone info
-        if microphones:
-            current_mic_info = next((mic for mic in microphones if mic['index'] == self.selected_microphone), microphones[0])
-            mic_info_label = tk.Label(
-                mic_frame,
-                text=f"Channels: {current_mic_info['channels']} | Sample Rate: {current_mic_info['sample_rate']} Hz",
-                font=("Roboto", 10),
-                bg='#F7F5F3',
-                fg='#2C2C2C'
-            )
-            mic_info_label.pack(anchor=tk.W, padx=0, pady=(0, 10))
+        if microphones and self.selected_microphone is not None:
+            current_mic_name = f"{self.selected_microphone}: {next((mic['name'] for mic in microphones if mic['index'] == self.selected_microphone), 'Unknown')}"
+            if current_mic_name in mic_names:
+                mic_dropdown.set(current_mic_name)
+            else:
+                mic_dropdown.set(mic_names[0])
+        elif mic_names:
+            mic_dropdown.set(mic_names[0])
         
         # Save button
-        save_button = tk.Button(
+        save_button = ctk.CTkButton(
             main_frame,
             text="Save Settings",
             command=lambda: self.save_settings_from_dialog(
-                settings_window, api_entry, record_entry
+                settings_window, api_entry, hotkey_entry, mic_dropdown, microphones
             ),
-            font=("Roboto", 12, "bold"),
-            bg='#F7F5F3',
-            fg='#2C2C2C',
-            relief=tk.FLAT,
-            bd=2,
-            padx=30,
-            pady=12,
-            cursor='hand2',
-            activebackground='#E8E6E4',
-            highlightthickness=1,
-            highlightbackground='#2C2C2C'
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+            corner_radius=25,
+            height=45,
+            width=200,
+            fg_color="#2C2C2C",
+            text_color="#F7F5F3",
+            hover_color="#1A1A1A",
+            border_color="#2C2C2C",
+            border_width=1
         )
-        save_button.pack(pady=20)
+        save_button.pack(pady=30)
+    
+    def save_api_key_only(self, api_entry):
+        """Save only the API key immediately"""
+        new_api_key = api_entry.get().strip()
+        
+        if not new_api_key:
+            messagebox.showerror("Error", "Please enter your API key")
+            return
+        
+        # Update and save API key
+        self.api_key = new_api_key
+        self.save_settings()
+        
+        print(f"API key saved successfully!")
+        messagebox.showinfo("Success", "API key saved! You won't need to enter it again.")
     
     def show_vocabulary_library(self):
-        """Show vocabulary library dialog"""
-        vocab_window = tk.Toplevel(self.root)
+        """Show vocabulary library dialog with CustomTkinter"""
+        vocab_window = ctk.CTkToplevel(self.root)
         vocab_window.title("Custom Vocabulary Library")
-        vocab_window.geometry("650x600")
-        vocab_window.configure(bg='#F7F5F3')
+        vocab_window.geometry("700x650")
         vocab_window.resizable(False, False)
         
         # Center the vocabulary window
@@ -976,169 +874,115 @@ class VoiceTyping:
         vocab_window.geometry(f'{width}x{height}+{x}+{y}')
         
         # Main container
-        main_frame = tk.Frame(vocab_window, bg='#F7F5F3')
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=40, pady=30)
+        main_frame = ctk.CTkFrame(vocab_window, corner_radius=15)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
         # Title
-        title_label = tk.Label(
+        title_label = ctk.CTkLabel(
             main_frame,
             text="Custom Vocabulary Library",
-            font=("Montserrat", 24, "bold"),
-            bg='#F7F5F3',
-            fg='#2C2C2C'
+            font=ctk.CTkFont(family="Segoe UI", size=28, weight="bold")
         )
-        title_label.pack(pady=(0, 10))
+        title_label.pack(pady=(20, 10))
         
         # Description
-        desc_label = tk.Label(
+        desc_label = ctk.CTkLabel(
             main_frame,
             text="Add specialized words to improve transcription accuracy.\nAssemblyAI will learn to recognize these words better.",
-            font=("Roboto", 12),
-            bg='#F7F5F3',
-            fg='#2C2C2C',
-            justify=tk.CENTER
+            font=ctk.CTkFont(family="Segoe UI", size=14)
         )
-        desc_label.pack(pady=(0, 30))
+        desc_label.pack(pady=(0, 25))
         
         # Add word section
-        add_frame = tk.LabelFrame(
+        add_title = ctk.CTkLabel(
             main_frame,
             text="Add New Word",
-            font=("Roboto", 14, "bold"),
-            bg='#F7F5F3',
-            fg='#2C2C2C',
-            relief=tk.FLAT,
-            bd=1,
-            padx=20,
-            pady=15
+            font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold")
         )
-        add_frame.pack(fill=tk.X, pady=(0, 25))
+        add_title.pack(pady=(0, 10))
         
         # Word entry
-        word_label = tk.Label(
-            add_frame,
-            text="Enter specialized word or phrase:",
-            font=("Roboto", 12),
-            bg='#F7F5F3',
-            fg='#2C2C2C'
+        word_entry = ctk.CTkEntry(
+            main_frame,
+            placeholder_text="Enter specialized word or phrase",
+            font=ctk.CTkFont(family="Segoe UI", size=12),
+            width=400,
+            height=35
         )
-        word_label.pack(anchor=tk.W, padx=0, pady=(10, 8))
-        
-        word_entry = tk.Entry(
-            add_frame,
-            font=("Roboto", 12),
-            width=45,
-            relief=tk.FLAT,
-            bd=1,
-            bg='#FFFFFF',
-            fg='#2C2C2C',
-            insertbackground='#2C2C2C',
-            highlightthickness=1,
-            highlightcolor='#2C2C2C',
-            highlightbackground='#CCCCCC'
-        )
-        word_entry.pack(padx=0, pady=(0, 15), ipady=8)
+        word_entry.pack(pady=(0, 15))
         
         # Add button
-        add_button = tk.Button(
-            add_frame,
+        add_button = ctk.CTkButton(
+            main_frame,
             text="Add Word",
-            command=lambda: self.add_word_from_dialog(word_entry, word_listbox),
-            font=("Roboto", 11, "bold"),
-            bg='#F7F5F3',
-            fg='#2C2C2C',
-            relief=tk.FLAT,
-            bd=1,
-            padx=20,
-            pady=8,
-            cursor='hand2',
-            activebackground='#E8E6E4',
-            highlightthickness=1,
-            highlightbackground='#2C2C2C'
+            command=lambda: self.add_word_from_dialog(word_entry, word_textbox),
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            width=120,
+            height=32,
+            fg_color="#F7F5F3",
+            text_color="#2C2C2C",
+            hover_color="#E8E6E4",
+            border_color="#2C2C2C",
+            border_width=1
         )
-        add_button.pack(pady=(0, 10))
+        add_button.pack(pady=(0, 25))
         
         # Current vocabulary section
-        vocab_frame = tk.LabelFrame(
+        vocab_title = ctk.CTkLabel(
             main_frame,
             text=f"Current Vocabulary ({len(self.custom_vocabulary)} words)",
-            font=("Roboto", 14, "bold"),
-            bg='#F7F5F3',
-            fg='#2C2C2C',
-            relief=tk.FLAT,
-            bd=1,
-            padx=20,
-            pady=15
+            font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold")
         )
-        vocab_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 25))
+        vocab_title.pack(pady=(20, 10))
         
-        # Word listbox with scrollbar
-        list_frame = tk.Frame(vocab_frame, bg='#F7F5F3')
-        list_frame.pack(fill=tk.BOTH, expand=True, padx=0, pady=(10, 15))
-        
-        word_listbox = tk.Listbox(
-            list_frame,
-            font=("Roboto", 11),
-            bg='#FFFFFF',
-            fg='#2C2C2C',
-            selectbackground='#E8E6E4',
-            selectforeground='#2C2C2C',
-            relief=tk.FLAT,
-            bd=1,
-            height=12,
-            highlightthickness=1,
-            highlightcolor='#2C2C2C',
-            highlightbackground='#CCCCCC'
+        # Word textbox with scrollbar (CustomTkinter doesn't have Listbox, use Textbox)
+        word_textbox = ctk.CTkTextbox(
+            main_frame,
+            width=600,
+            height=250,
+            font=ctk.CTkFont(family="Segoe UI", size=11)
         )
-        word_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        word_textbox.pack(pady=(0, 15), padx=20)
         
-        scrollbar = tk.Scrollbar(list_frame, orient=tk.VERTICAL, command=word_listbox.yview)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        word_listbox.config(yscrollcommand=scrollbar.set)
+        # Populate textbox
+        if self.custom_vocabulary:
+            word_textbox.insert("1.0", "\n".join(self.custom_vocabulary))
         
-        # Populate listbox
-        for word in self.custom_vocabulary:
-            word_listbox.insert(tk.END, word)
+        # Button frame
+        button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        button_frame.pack(pady=(0, 15))
         
         # Remove button
-        remove_button = tk.Button(
-            vocab_frame,
+        remove_button = ctk.CTkButton(
+            button_frame,
             text="Remove Selected",
-            command=lambda: self.remove_word_from_dialog(word_listbox),
-            font=("Roboto", 11, "bold"),
-            bg='#F7F5F3',
-            fg='#2C2C2C',
-            relief=tk.FLAT,
-            bd=1,
-            padx=20,
-            pady=8,
-            cursor='hand2',
-            activebackground='#E8E6E4',
-            highlightthickness=1,
-            highlightbackground='#2C2C2C'
+            command=lambda: self.remove_word_from_dialog_ctk(word_textbox),
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            width=140,
+            height=32,
+            fg_color="#F7F5F3",
+            text_color="#2C2C2C",
+            hover_color="#E8E6E4",
+            border_color="#2C2C2C",
+            border_width=1
         )
-        remove_button.pack(pady=(0, 10))
+        remove_button.pack(side="left", padx=5)
         
         # Close button
-        close_button = tk.Button(
-            main_frame,
+        close_button = ctk.CTkButton(
+            button_frame,
             text="Done",
             command=vocab_window.destroy,
-            font=("Roboto", 12, "bold"),
-            bg='#F7F5F3',
-            fg='#2C2C2C',
-            relief=tk.FLAT,
-            bd=2,
-            padx=30,
-            pady=12,
-            cursor='hand2',
-            activebackground='#E8E6E4',
-            highlightthickness=1,
-            highlightbackground='#2C2C2C'
+            font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            width=100,
+            height=32,
+            fg_color="#2C2C2C",
+            text_color="#F7F5F3",
+            hover_color="#1A1A1A"
         )
-        close_button.pack(pady=15)
+        close_button.pack(side="left", padx=5)
     
-    def add_word_from_dialog(self, entry, listbox):
+    def add_word_from_dialog(self, entry, textbox):
         """Add word from vocabulary dialog"""
         word = entry.get().strip()
         if not word:
@@ -1146,14 +990,40 @@ class VoiceTyping:
             return
         
         if self.add_custom_word(word):
-            listbox.insert(tk.END, word)
-            entry.delete(0, tk.END)
+            # Update the textbox display
+            textbox.delete("1.0", "end")
+            if self.custom_vocabulary:
+                textbox.insert("1.0", "\n".join(self.custom_vocabulary))
+            entry.delete(0, "end")
             pass  # Silent success
         else:
             messagebox.showerror("Error", f"'{word}' is already in vocabulary")
     
+    def remove_word_from_dialog_ctk(self, textbox):
+        """Remove word from vocabulary dialog (CustomTkinter version)"""
+        try:
+            # Get selected text
+            selected_text = textbox.get("sel.first", "sel.last").strip()
+            if not selected_text:
+                messagebox.showerror("Error", "Please select a word to remove")
+                return
+            
+            # Remove only the first line if multiple lines selected
+            word_to_remove = selected_text.split('\n')[0].strip()
+            
+            if self.remove_custom_word(word_to_remove):
+                # Update the textbox display
+                textbox.delete("1.0", "end")
+                if self.custom_vocabulary:
+                    textbox.insert("1.0", "\n".join(self.custom_vocabulary))
+                pass  # Silent success
+            else:
+                messagebox.showerror("Error", f"Could not remove '{word_to_remove}'")
+        except:
+            messagebox.showerror("Error", "Please select a word to remove")
+    
     def remove_word_from_dialog(self, listbox):
-        """Remove word from vocabulary dialog"""
+        """Remove word from vocabulary dialog (legacy method - kept for compatibility)"""
         selection = listbox.curselection()
         if not selection:
             messagebox.showerror("Error", "Please select a word to remove")
@@ -1167,11 +1037,20 @@ class VoiceTyping:
             messagebox.showerror("Error", f"Could not remove '{word}'")
     
     def toggle_api_visibility(self, entry):
-        """Toggle API key visibility"""
-        if entry.cget('show') == '*':
-            entry.config(show='')
-        else:
-            entry.config(show='*')
+        """Toggle API key visibility for CustomTkinter entry"""
+        try:
+            # For CustomTkinter CTkEntry, use different method
+            if hasattr(entry, 'cget'):
+                if entry.cget('show') == '*':
+                    entry.configure(show='')
+                else:
+                    entry.configure(show='*')
+        except:
+            # Fallback for regular tkinter entries
+            if entry.cget('show') == '*':
+                entry.config(show='')
+            else:
+                entry.config(show='*')
     
     def on_microphone_selected(self, selection, microphones):
         """Handle microphone selection"""
@@ -1181,11 +1060,12 @@ class VoiceTyping:
         except:
             pass
     
-    def save_settings_from_dialog(self, window, api_entry, record_entry):
+    def save_settings_from_dialog(self, window, api_entry, hotkey_entry, mic_dropdown, microphones):
         """Save settings from dialog"""
-        # Get values
+        # Get values from CustomTkinter widgets
         new_api_key = api_entry.get().strip()
-        new_record_hotkey = record_entry.get().strip().lower()
+        new_record_hotkey = hotkey_entry.get().strip().lower()
+        new_microphone_selection = mic_dropdown.get()
         
         if not new_api_key:
             messagebox.showerror("Error", "Please enter your API key")
@@ -1195,9 +1075,18 @@ class VoiceTyping:
             messagebox.showerror("Error", "Please enter the hotkey")
             return
         
+        # Parse microphone selection to get index
+        new_microphone_index = 0
+        if new_microphone_selection and new_microphone_selection != "No microphones detected":
+            try:
+                new_microphone_index = int(new_microphone_selection.split(':')[0])
+            except:
+                new_microphone_index = 0
+        
         # Update settings
         self.api_key = new_api_key
         self.record_hotkey = new_record_hotkey
+        self.selected_microphone = new_microphone_index
         
         # Save to file
         self.save_settings()
@@ -1208,12 +1097,14 @@ class VoiceTyping:
         # Update instructions
         self.update_instructions()
         
-        window.destroy()  # Silent success - no notification needed
+        print(f"Settings saved: API key updated, hotkey: {new_record_hotkey}, microphone index: {new_microphone_index}")
+        messagebox.showinfo("Success", "Settings saved successfully!")
+        window.destroy()
     
     def update_instructions(self):
         """Update the instructions with current hotkeys"""
         if hasattr(self, 'hotkey_label'):
-            self.hotkey_label.config(text=f"Hold {self.record_hotkey.upper()} to record voice")
+            self.hotkey_label.configure(text=f"Hold {self.record_hotkey.upper()} to record voice")
     
     def setup_hotkeys(self):
         """Setup keyboard hotkeys for hold-to-record functionality"""
@@ -1223,20 +1114,32 @@ class VoiceTyping:
         except:
             pass
         
-        # Parse the hotkey to get individual keys
-        keys = self.record_hotkey.split('+')
-        if len(keys) >= 2:
-            # For combined hotkeys like 'ctrl+shift+r', we need to track key states
-            self.hotkey_keys = keys
-            self.hotkey_pressed = False
+        # Use the built-in keyboard.add_hotkey for proper suppression
+        try:
+            # This will only suppress the key combination, not individual keys
+            keyboard.add_hotkey(self.record_hotkey, self.start_recording, suppress=True)
             
-            # Set up individual key listeners WITHOUT suppress=True to allow normal typing
-            for key in keys:
-                keyboard.on_press_key(key, self.on_key_press, suppress=False)
-                keyboard.on_release_key(key, self.on_key_release, suppress=False)
-        else:
-            # Single key hotkey
-            keyboard.add_hotkey(self.record_hotkey, self.toggle_recording, suppress=True)
+            # Set up a separate listener for release detection
+            keys = self.record_hotkey.split('+')
+            if len(keys) >= 2:
+                # Track when the combination is released
+                self.hotkey_keys = keys
+                self.hotkey_active = False
+                
+                # Monitor key releases to stop recording
+                for key in keys:
+                    keyboard.on_release_key(key, self.check_hotkey_release, suppress=False)
+            
+            print(f"Hotkey {self.record_hotkey} registered successfully")
+            
+        except Exception as e:
+            print(f"Error setting up hotkey {self.record_hotkey}: {e}")
+            # Fallback to simple toggle method
+            try:
+                keyboard.add_hotkey(self.record_hotkey, self.toggle_recording, suppress=True)
+                print(f"Fallback hotkey registered for toggle mode")
+            except Exception as e2:
+                print(f"Failed to register any hotkey: {e2}")
     
     def toggle_recording(self):
         """Toggle recording - start if not recording, stop if recording"""
@@ -1245,29 +1148,16 @@ class VoiceTyping:
         else:
             self.stop_recording()
     
-    def on_key_press(self, e):
-        """Handle key press for hold-to-record"""
-        if hasattr(self, 'hotkey_keys'):
-            # Only trigger if this is the last key in the combination
-            # and all other keys are already pressed
+    def check_hotkey_release(self, e):
+        """Check if hotkey combination is released to stop recording"""
+        if hasattr(self, 'hotkey_keys') and self.is_recording:
             current_key = e.name.lower()
             if current_key in self.hotkey_keys:
-                other_keys = [k for k in self.hotkey_keys if k != current_key]
-                if all(keyboard.is_pressed(key) for key in other_keys):
-                    if not self.hotkey_pressed and not self.is_recording:
-                        self.hotkey_pressed = True
-                        self.start_recording()
-    
-    def on_key_release(self, e):
-        """Handle key release for hold-to-record"""
-        if hasattr(self, 'hotkey_keys'):
-            # Only stop if this is one of the hotkey keys and any key in the combination is released
-            current_key = e.name.lower()
-            if current_key in self.hotkey_keys:
+                # Check if any of the hotkey keys are no longer pressed
                 if not all(keyboard.is_pressed(key) for key in self.hotkey_keys):
-                    if self.hotkey_pressed and self.is_recording:
-                        self.hotkey_pressed = False
-                        self.stop_recording()
+                    self.stop_recording()
+    
+
     
     def check_api_key(self):
         """Check if API key is set"""
@@ -1282,10 +1172,12 @@ class VoiceTyping:
         
         self.is_recording = True
         self.audio_frames = []
+        if hasattr(self, 'hotkey_active'):
+            self.hotkey_active = True
         
         # Update GUI
-        self.status_label.config(text="Recording... Speak now!", fg='#2C2C2C')
-        self.record_button.config(text="Stop Test")
+        self.status_label.configure(text="Recording... Speak now!")
+        self.record_button.configure(text="Stop")
         
         # Update recording indicator
         if hasattr(self, 'recording_button'):
@@ -1304,8 +1196,8 @@ class VoiceTyping:
         self.is_recording = False
         
         # Update GUI
-        self.status_label.config(text="Processing...", fg='#2C2C2C')
-        self.record_button.config(text="Test Recording")
+        self.status_label.configure(text="Processing...")
+        self.record_button.configure(text="Test")
         
         # Update recording indicator
         if hasattr(self, 'recording_button'):
@@ -1318,11 +1210,16 @@ class VoiceTyping:
         
         # Transcribe the audio
         if self.audio_frames:
+            print(f"Audio recorded: {len(self.audio_frames)} frames")
             self.transcribe_audio()
+        else:
+            print("No audio frames recorded!")
+            self.status_label.configure(text="No audio recorded - check microphone")
     
     def record_audio(self):
         """Record audio from microphone"""
         try:
+            print(f"Opening audio stream with microphone {self.selected_microphone}")
             self.stream = self.audio.open(
                 format=pyaudio.paInt16,
                 channels=self.channels,
@@ -1331,6 +1228,7 @@ class VoiceTyping:
                 input_device_index=self.selected_microphone,
                 frames_per_buffer=self.chunk_size
             )
+            print("Audio stream opened successfully")
             
             while self.is_recording:
                 data = self.stream.read(self.chunk_size)
@@ -1339,6 +1237,7 @@ class VoiceTyping:
         except Exception as e:
             print(f"Error recording audio: {e}")
             self.is_recording = False
+            messagebox.showerror("Recording Error", f"Could not record audio: {str(e)}\n\nCheck your microphone selection in Settings.")
     
     def transcribe_audio(self):
         """Transcribe the recorded audio using AssemblyAI"""
@@ -1353,19 +1252,25 @@ class VoiceTyping:
                 wf.writeframes(b''.join(self.audio_frames))
             
             # Upload to AssemblyAI
-            headers = {
-                'authorization': self.api_key,
-                'content-type': 'application/json'
+            upload_headers = {
+                'authorization': self.api_key
+                # Don't set content-type - let requests auto-detect for binary data
             }
             
             # Upload the file
             upload_url = "https://api.assemblyai.com/v2/upload"
             
             with open(temp_filename, "rb") as f:
-                response = requests.post(upload_url, headers=headers, data=f)
+                response = requests.post(upload_url, headers=upload_headers, data=f)
                 
                 if response.status_code != 200:
-                    raise Exception(f"Upload failed: {response.status_code}")
+                    error_details = ""
+                    try:
+                        error_response = response.json()
+                        error_details = f" - {error_response.get('error', 'Unknown error')}"
+                    except:
+                        error_details = f" - Response: {response.text[:200]}"
+                    raise Exception(f"Upload failed: {response.status_code}{error_details}")
                 
                 upload_response = response.json()
                 audio_url = upload_response['upload_url']
@@ -1386,10 +1291,22 @@ class VoiceTyping:
             if self.custom_vocabulary:
                 transcript_request['custom_vocabulary'] = self.custom_vocabulary
             
-            response = requests.post(transcript_url, json=transcript_request, headers=headers)
+            # Headers for JSON transcription request
+            transcript_headers = {
+                'authorization': self.api_key,
+                'content-type': 'application/json'
+            }
+            
+            response = requests.post(transcript_url, json=transcript_request, headers=transcript_headers)
             
             if response.status_code != 200:
-                raise Exception(f"Transcription request failed: {response.status_code}")
+                error_details = ""
+                try:
+                    error_response = response.json()
+                    error_details = f" - {error_response.get('error', 'Unknown error')}"
+                except:
+                    error_details = f" - Response: {response.text[:200]}"
+                raise Exception(f"Transcription request failed: {response.status_code}{error_details}")
             
             transcript_response = response.json()
             transcript_id = transcript_response['id']
@@ -1398,7 +1315,7 @@ class VoiceTyping:
             polling_url = f"https://api.assemblyai.com/v2/transcript/{transcript_id}"
             
             while True:
-                polling_response = requests.get(polling_url, headers=headers)
+                polling_response = requests.get(polling_url, headers=transcript_headers)
                 
                 if polling_response.status_code != 200:
                     raise Exception(f"Polling failed: {polling_response.status_code}")
@@ -1412,11 +1329,15 @@ class VoiceTyping:
                     # Process sentiment and context
                     enhanced_text = self.process_enhanced_transcription(result, transcribed_text)
                     
-                    # Type the enhanced text directly into the focused application
-                    self.type_text(enhanced_text)
+                    # Display in test textbox if testing, otherwise type into focused application
+                    if hasattr(self, 'test_textbox'):
+                        self.test_textbox.delete("1.0", "end")
+                        self.test_textbox.insert("1.0", enhanced_text)
+                    else:
+                        self.type_text(enhanced_text)
                     
                     # Update status
-                    self.status_label.config(text="Ready to voice type", fg='#2C2C2C')
+                    self.status_label.configure(text="Ready to voice type")
                     break
                     
                 elif result['status'] == 'error':
@@ -1431,7 +1352,7 @@ class VoiceTyping:
         except Exception as e:
             print(f"Error transcribing audio: {e}")
             messagebox.showerror("Error", f"Transcription failed: {str(e)}")
-            self.status_label.config(text="Ready to voice type", fg='#2C2C2C')
+            self.status_label.configure(text="Ready to voice type")
     
     def process_enhanced_transcription(self, result, text):
         """Process transcription with sentiment and context analysis"""
