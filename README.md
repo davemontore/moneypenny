@@ -9,6 +9,7 @@
 - **Types into any app**: Output is typed into the focused window
 - **Headless**: No GUI; runs quietly in the background
 - **Quick exit**: Press Ctrl+Alt+Q (or ESC in console) to quit
+ - **Lexicon biasing**: Add your own terms in `lexicon.txt` to bias transcription
 
 ## 🚀 Quick Start
 
@@ -56,6 +57,19 @@ Note: Use either the `.bat` shortcut OR the VBS shortcut in Startup, not both, t
 - Default model: `base.en` on CPU (`int8`) for a good speed/accuracy balance
 - Faster option: set `MODEL_SIZE = "tiny.en"` in `voice_to_text.py`
 - GPU option: change model init to `device="cuda", compute_type="float16"`
+ - Lexicon: create `lexicon.txt` (one term/phrase per line). Example:
+   ```
+   # military terms
+   JTAC
+   ISR
+   CAS
+   # medical
+   psilocybin
+   ibogaine
+   # places
+   Pattaya
+   Khost
+   ```
 
 ## 📁 Project Structure
 
@@ -89,3 +103,56 @@ MIT License - see the [LICENSE](LICENSE)
 ## Notes
 
 - Previous GUI and cloud API features are deprecated in v2.2.0 in favor of a faster, simpler, local workflow.
+
+---
+
+## 🟢 Simple Setup for Non‑Technical Users (Windows)
+
+These steps avoid any coding or commands. You’ll click and open files like any normal app.
+
+- What you need:
+  - A Windows 10/11 PC with a microphone
+  - Internet connection the first time (to download the voice model)
+
+1) Install Python
+   - Go to `https://www.python.org/downloads/`
+   - Click “Download Python 3.x”
+   - In the installer: check “Add Python to PATH”, then click “Install Now”
+
+2) Get the app
+   - Go to the project page: `https://github.com/davemontore/moneypenny`
+   - Click the green “Code” button → “Download ZIP”
+   - Right‑click the downloaded ZIP → “Extract All...”
+   - Put the extracted “MoneyPenny” folder in your Documents folder
+
+3) Start the app
+   - Open the “MoneyPenny” folder
+   - Double‑click “MoneyPenny Voice Typing.bat”
+   - The first run will download the voice model (takes a minute). When you see “Whisper model loaded.” it’s ready
+   - If Windows warns you (SmartScreen), click “More info” → “Run anyway”
+
+4) Use it
+   - Click into any text field (Notepad, email, browser)
+   - Hold the RIGHT CTRL key while you speak
+   - Release RIGHT CTRL to finish; your words will appear
+   - To stop the app: press Ctrl+Alt+Q (or close the black window if it’s open)
+
+5) Make it start automatically (optional)
+   - Press the Windows key + R → type `shell:startup` → press Enter
+   - In another window, find your “MoneyPenny” folder
+   - Right‑click “MoneyPenny Voice Typing.bat” → “Create shortcut”
+   - Drag that shortcut into the Startup folder you opened
+   - That’s it. Next time you sign in, the app starts for you
+   - Want no black window? See “Hidden at login” instructions above; if that’s confusing, use the AI prompts below
+
+6) Add uncommon words (optional)
+   - In the “MoneyPenny” folder, double‑click `lexicon.txt`
+   - Type one word or phrase per line (e.g., names, medical terms)
+   - Save the file and restart the app
+
+### Copy‑and‑paste prompts for an AI helper (optional)
+
+- “I’m on Windows 11. Help me install Python with ‘Add to PATH’ checked and confirm it’s installed.”
+- “I downloaded `moneypenny` as a ZIP from GitHub. Walk me through extracting it to Documents and running ‘MoneyPenny Voice Typing.bat’.”
+- “Create a `run_silent.vbs` file next to `voice_to_text.py` that starts the app hidden, and help me put a shortcut to it in `shell:startup` so it runs at login.”
+- “I want to add words to improve transcription. Show me how to edit `lexicon.txt`, save it, and restart the app.”

@@ -8,6 +8,7 @@
 - Headless operation (no GUI) with global hotkeys
 - True hold-to-record using RIGHT CTRL (press to record, release to transcribe)
 - Added quit hotkey: Ctrl+Alt+Q for clean shutdown
+ - Added lexicon support via `lexicon.txt` using `initial_prompt` biasing
 
 ### 🔧 Technical Notes
 - Implemented background recording thread with graceful shutdown

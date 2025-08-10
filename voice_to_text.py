@@ -6,6 +6,7 @@ import threading
 import time
 import io
 import wave
+import os
 
 # --- Configuration ---
 # Audio recording parameters
@@ -25,6 +26,36 @@ p = pyaudio.PyAudio()
 stream = None
 keyboard_controller = Controller()
 stop_event = threading.Event()
+LEXICON_PROMPT = ""
+
+
+def load_lexicon_prompt(file_path: str = "lexicon.txt") -> str:
+    """Load user-provided terms from a text file and build an initial prompt.
+    Each non-empty, non-comment line is treated as a term/phrase.
+    """
+    if not os.path.exists(file_path):
+        return ""
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            terms = [
+                line.strip()
+                for line in f.readlines()
+                if line.strip() and not line.strip().startswith("#")
+            ]
+        if not terms:
+            return ""
+        # Keep prompt reasonably short; take first N terms
+        max_terms = 50
+        selected = terms[:max_terms]
+        # Natural-language context helps whisper biasing more than raw word lists
+        prompt = (
+            "Transcribe clearly using these domain terms and proper nouns when appropriate: "
+            + ", ".join(selected)
+            + "."
+        )
+        return prompt[:600]  # cap length to be safe
+    except Exception:
+        return ""
 
 # --- Whisper Model Loading ---
 # This might take a few seconds the first time you run it as it downloads the model
@@ -33,6 +64,11 @@ print(f"Loading Whisper model: '{MODEL_SIZE}'...")
 # To run on GPU: device="cuda", compute_type="float16"
 model = WhisperModel(MODEL_SIZE, device="cpu", compute_type="int8")
 print("Whisper model loaded.")
+
+# Load lexicon prompt if present
+LEXICON_PROMPT = load_lexicon_prompt()
+if LEXICON_PROMPT:
+    print("Lexicon loaded (biasing terms enabled).")
 
 
 # --- Main Logic ---
@@ -55,7 +91,19 @@ def transcribe_audio_chunk():
 
     print("Transcribing... ")
     # Transcribe the audio from the buffer
-    segments, info = model.transcribe(wav_buffer, beam_size=5)
+    if LEXICON_PROMPT:
+        segments, info = model.transcribe(
+            wav_buffer,
+            beam_size=5,
+            language="en",
+            initial_prompt=LEXICON_PROMPT,
+        )
+    else:
+        segments, info = model.transcribe(
+            wav_buffer,
+            beam_size=5,
+            language="en",
+        )
 
     transcribed_text = "".join(segment.text for segment in segments).strip()
     
