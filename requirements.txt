@@ -1,7 +1,9 @@
 pyaudio
 keyboard
+pynput
+assemblyai
 requests
 cryptography
 win10toast
 psutil
-customtkinter
+faster-whisper

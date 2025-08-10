@@ -1,7 +1,7 @@
-# CustomTkinter Upgrade Summary
+# CustomTkinter Upgrade Summary (Legacy)
 
 ## Overview
-Successfully upgraded the Voice Typing app from traditional Tkinter to modern CustomTkinter, resolving the microphone dropdown rendering issue and implementing a consistent modern design.
+Note: As of v2.2.0 the app is headless and does not use a GUI. This document remains as legacy reference for the previous UI work.
 
 ## Issues Resolved
 

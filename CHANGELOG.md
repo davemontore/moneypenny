@@ -1,5 +1,27 @@
 # Voice Typing App - Changelog
 
+## Version 2.2.0 - Local Faster-Whisper, Headless, Hold-to-Record
+*Released: August 2025*
+
+### 🚀 Core Changes
+- Switched transcription from AssemblyAI (cloud) to local `faster-whisper` for lower latency and offline capability
+- Headless operation (no GUI) with global hotkeys
+- True hold-to-record using RIGHT CTRL (press to record, release to transcribe)
+- Added quit hotkey: Ctrl+Alt+Q for clean shutdown
+
+### 🔧 Technical Notes
+- Implemented background recording thread with graceful shutdown
+- In-memory WAV buffer fed to `WhisperModel.transcribe`
+- Default model: `base.en` on CPU `int8` (configurable)
+- Typing output via `pynput` keyboard controller
+- Startup guidance: use `run_silent.vbs` in Windows Startup for hidden launch
+
+### 📦 Dependencies
+- Added: `faster-whisper`
+- Legacy: AssemblyAI references removed from runtime path (requirements still lists `assemblyai` but no longer used)
+
+---
+
 ## Version 2.1.0 - CustomTkinter Modernization & Critical Fixes
 *Released: December 2024*
 

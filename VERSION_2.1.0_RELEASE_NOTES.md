@@ -1,36 +1,37 @@
-# Voice Typing App - Version 2.1.0 Release Notes
+# Voice Typing App - Version 2.2.0 Release Notes
 
-## 🎉 Major Update: CustomTkinter Modernization & Critical Fixes
+## 🎉 Major Update: Local Faster-Whisper, Headless, Hold-to-Record
 
-### 📅 Release Date: December 2024
-
----
-
-## 🎨 **Visual Transformation**
-
-### Modern Interface Overhaul
-- **Framework Migration**: Complete upgrade from Tkinter to CustomTkinter
-- **Flat Design**: Removed all dark gray section frames for unified appearance
-- **Professional Typography**: Montserrat/Roboto font pairing with proper hierarchy
-- **Clean Aesthetics**: No emojis, sleek borders, contemporary button styling
-- **Consistent Theming**: Cream (#F7F5F3) background with charcoal (#2C2C2C) text
-
-### Enhanced User Experience
-- **Hero Layout**: Large title with elegant subtitle positioning
-- **Simplified Controls**: "Test Recording" → "Test" for cleaner interface
-- **Built-in Test Area**: Text box for immediate transcription preview
-- **Responsive Design**: Proper spacing and button hierarchy
+### 📅 Release Date: August 2025
 
 ---
 
-## 🔧 **Critical Bug Fixes**
+## 🚀 **Core Changes**
 
-### 1. Microphone Dropdown Issue ✅ FIXED
-**Problem**: Settings dropdown not rendering due to data type mismatch
-**Solution**: 
-- Fixed CustomTkinter implementation
-- Corrected data formatting (objects → strings)
-- Removed conflicting legacy code
+### Local Transcription
+- Replaced cloud AssemblyAI with on-device `faster-whisper`
+- Default model: `base.en` (CPU, int8) for good speed/accuracy balance
+- Configurable to `tiny.en` (faster) or GPU (`device="cuda"`)
+
+### Headless Operation
+- No GUI; runs in background
+- Global hotkeys:
+  - Hold RIGHT CTRL to record; release to transcribe
+  - Ctrl+Alt+Q to quit cleanly
+
+### Startup Options
+- Windows Startup support via Startup folder shortcut
+- Hidden launch using `run_silent.vbs` (recommended for no console window)
+
+---
+
+## 🔧 **Technical Notes**
+
+### Audio Pipeline
+- PyAudio 16kHz mono stream; background thread collects frames
+- In-memory WAV buffer; passed to Whisper for transcription
+### Output
+- Types transcribed text into focused window via `pynput` controller
 
 ### 2. Transcription API Failure ✅ FIXED
 **Problem**: HTTP 400 errors due to incorrect content-type headers
@@ -48,12 +49,10 @@
 
 ---
 
-## ✨ **New Features**
-
-### Built-in Testing
-- **Test Text Box**: Immediate transcription preview in app
-- **Smart Routing**: Test mode shows results locally, hotkey mode types externally
-- **Clear Feedback**: Better status messages and error handling
+## ✨ **User Experience**
+- Faster dictation with minimal latency
+- No API keys or internet required
+- Simple start/stop and quit hotkeys
 
 ### Enhanced Debugging
 - **Detailed Logging**: Comprehensive audio and API debugging
@@ -62,52 +61,24 @@
 
 ---
 
-## 🚀 **Technical Improvements**
-
-### Code Quality
-- **Modern Framework**: CustomTkinter for contemporary UI components
-- **Clean Architecture**: Separated concerns for different request types
-- **Robust Error Handling**: Comprehensive exception management
-- **Memory Management**: Improved widget cleanup and resource handling
-
-### Performance
-- **Efficient Rendering**: Flat design reduces UI complexity
-- **Optimized Requests**: Proper headers reduce API rejection rates
-- **Smart Suppression**: Minimal keyboard hook interference
+## 📦 **Dependencies**
+- Added: `faster-whisper`
+- Existing: `pyaudio`, `keyboard`, `pynput`, `psutil`
 
 ---
 
 ## 📋 **Migration Notes**
-
-### For Existing Users
-- **Settings Preserved**: All existing configurations maintained
-- **API Keys Safe**: Encrypted storage continues to work
-- **Hotkeys Unchanged**: Same key combinations, improved reliability
-- **Vocabulary Intact**: Custom words preserved and enhanced
-
-### System Requirements
-- **Python 3.8+**: Same as before
-- **CustomTkinter**: Now required dependency
-- **Windows 10/11**: Fully tested and supported
+- Remove any old expectation of GUI/settings; app is now headless
+- For startup at login, use shortcut to `.bat` (console) or `run_silent.vbs` (no console)
+- No API key required anymore
 
 ---
 
 ## 🔍 **Testing Completed**
-
-### Functionality Verified
-- ✅ Settings dialog renders correctly
-- ✅ Microphone dropdown populates and saves
-- ✅ API key entry with show/hide toggle
-- ✅ Transcription works with proper error handling
-- ✅ Hotkeys function without blocking normal typing
-- ✅ Test area shows transcription results
-- ✅ All dialogs use consistent modern styling
-
-### Performance Verified
-- ✅ No linting errors
-- ✅ Proper resource cleanup
-- ✅ Fast UI responsiveness
-- ✅ Minimal memory usage
+- ✅ Hold-to-record works with RIGHT CTRL
+- ✅ Ctrl+Alt+Q exits cleanly
+- ✅ Transcription types into focused app
+- ✅ Startup via `.bat` and hidden via `run_silent.vbs`
 
 ---
 

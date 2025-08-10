@@ -1,4 +1,4 @@
-# Voice Typing App - Troubleshooting Guide
+# Voice Typing App - Troubleshooting Guide (Legacy UI)
 
 ## Issue: Microphone Dropdown Not Rendering
 
@@ -6,7 +6,7 @@
 
 The settings dialog in `voice_to_text.py` had a critical implementation problem that prevented the microphone dropdown from rendering properly.
 
-**Status: ✅ RESOLVED in v2.1.0**
+Status: Legacy reference — as of v2.2.0 the app is headless and no longer uses the settings dialog. This document is kept for historical context only.
 
 ### Problem Details
 

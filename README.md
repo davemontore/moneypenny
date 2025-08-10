@@ -1,163 +1,91 @@
 # MoneyPenny - Voice Typing Assistant
 
-> A modern, local voice-to-text application designed to replace Whispr Flow.ai with enhanced features and better user experience.
+> A fast, local voice‑to‑text utility. Hold RIGHT CTRL to dictate, release to transcribe into the current text field.
 
 ## ✨ Features
 
-### 🎙️ **Voice Recognition**
-- **AssemblyAI Integration**: High-accuracy speech-to-text transcription
-- **Hold-to-Record**: Intuitive hotkey system (customizable)
-- **Custom Vocabulary**: Add specialized words for better accuracy
-- **Sentiment Analysis**: Automatic punctuation and context awareness
-
-### 🖥️ **User Interface**
-- **Modern Design**: Clean cream and black theme with Montserrat/Roboto fonts
-- **Draggable Recording Indicator**: Always-on-top rectangle widget for manual control
-- **System Tray Integration**: Minimize to background while staying operational
-- **Silent Success**: No interrupting notifications - only error alerts
-
-### 🔧 **Technical Features**
-- **Local Processing**: Runs entirely on your machine
-- **Secure API Key Storage**: Encrypted local storage of credentials
-- **Multi-Device Support**: Intelligent microphone detection and selection
-- **Process Management**: Automatic cleanup with no leftover processes
-- **Single Instance**: Prevents multiple app instances
+- **Local transcription**: Uses `faster-whisper` (no cloud, low latency)
+- **Hold‑to‑record**: Press and hold RIGHT CTRL, release to transcribe
+- **Types into any app**: Output is typed into the focused window
+- **Headless**: No GUI; runs quietly in the background
+- **Quick exit**: Press Ctrl+Alt+Q (or ESC in console) to quit
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Python 3.8 or higher
-- AssemblyAI API key ([Get one here](https://www.assemblyai.com/))
 
 ### Installation
 
-1. **Clone the repository:**
+1. Clone and install dependencies:
    ```bash
    git clone https://github.com/davemontore/moneypenny.git
    cd moneypenny
-   ```
-
-2. **Install dependencies:**
-   ```bash
    pip install -r requirements.txt
    ```
 
-3. **Run the application:**
-   ```bash
-   python voice_to_text.py
-   ```
+2. Start the app (choose one):
+   - Console: `python voice_to_text.py`
+   - Double‑click: `MoneyPenny Voice Typing.bat`
 
-4. **First-time setup:**
-   - Click "Settings" to enter your AssemblyAI API key
-   - Select your preferred microphone
-   - Customize hotkeys if desired
+3. Use it:
+   - Place the cursor in any text field
+   - Hold RIGHT CTRL to dictate
+   - Release to transcribe; text will be typed automatically
+   - Quit: Ctrl+Alt+Q (or ESC if running in console)
 
-### Alternative Launch Methods
+### Start automatically at login
 
-**Easy Windows Launch:**
-```bash
-# Double-click this file to run the app
-MoneyPenny Voice Typing.bat
-```
+- Console visible at login (simple):
+  1) Press Win+R → `shell:startup` → Enter
+  2) Copy your desktop shortcut for `MoneyPenny Voice Typing.bat` into that folder
 
-## 🎯 How to Use
+- Hidden at login (no console window):
+  1) Create `run_silent.vbs` in the project folder with:
+     ```vbscript
+     Set WshShell = CreateObject("WScript.Shell")
+     WshShell.Run "cmd /c python voice_to_text.py", 0, False
+     ```
+  2) Right‑click `run_silent.vbs` → Create shortcut
+  3) Move that shortcut into the Startup folder (`shell:startup`)
 
-### Basic Operation
-1. **Start Recording**: Hold your configured hotkey (default: Ctrl+Shift+R)
-2. **Speak Clearly**: Talk into your microphone
-3. **Release Hotkey**: Text appears where your cursor is focused
-4. **Manual Toggle**: Click the draggable recording indicator
+Note: Use either the `.bat` shortcut OR the VBS shortcut in Startup, not both, to avoid launching two copies.
 
-### Advanced Features
-- **Custom Words**: Add technical terms or names via Settings → Vocabulary Library
-- **Microphone Selection**: Choose from detected audio devices
-- **Drag Indicator**: Move the recording widget anywhere on screen
-- **System Tray**: Minimize app while keeping it functional
+## ⚙️ Configuration
+
+- Default model: `base.en` on CPU (`int8`) for a good speed/accuracy balance
+- Faster option: set `MODEL_SIZE = "tiny.en"` in `voice_to_text.py`
+- GPU option: change model init to `device="cuda", compute_type="float16"`
 
 ## 📁 Project Structure
 
 ```
-moneypenny/
-├── voice_to_text.py          # Main application
-├── requirements.txt          # Python dependencies
-├── run_voice_typing.bat      # Windows launcher
-├── CHANGELOG.md              # Version history
-├── DEBUGGING_REFERENCE.md    # Troubleshooting guide
-└── README.md                 # This file
+MoneyPenny/
+├── voice_to_text.py            # Main application (headless, hotkeys)
+├── requirements.txt            # Python dependencies
+├── MoneyPenny Voice Typing.bat # Windows launcher (console)
+├── run_silent.vbs              # Optional hidden launcher (no console)
+├── CHANGELOG.md                # Version history
+├── DEBUGGING_REFERENCE.md      # Troubleshooting guide
+└── README.md                   # This file
 ```
-
-## 🛠️ Configuration
-
-### Settings Storage
-- **Location**: `settings.json` (created on first run)
-- **Encryption**: API keys stored with Fernet encryption
-- **Backup**: Keep your `encryption.key` file safe
-
-### Hotkey Customization
-- Access via Settings dialog
-- Supports modifier combinations (Ctrl, Shift, Alt)
-- Hold-to-record functionality
-
-### Microphone Setup
-- Automatic device detection
-- Filters out system/virtual devices
-- Manual selection via dropdown
 
 ## 🔍 Troubleshooting
 
-### Common Issues
+- Nothing happens when holding RIGHT CTRL:
+  - Ensure the app is running (via console or launcher)
+  - Try running the console as Administrator (hotkeys may need elevation)
+  - Make sure the text caret is in a text field
+  - Check microphone default device and levels in Windows
 
-**App won't start:**
-- Check if another instance is running
-- Verify Python version (3.8+)
-- Install missing dependencies
-
-**No microphone detected:**
-- Check audio device permissions
-- Try different microphone
-- Restart audio services
-
-**Transcription errors:**
-- Verify internet connection
-- Check AssemblyAI API key validity
-- Review microphone input levels
-
-**Recording indicator missing:**
-- Look for debug output in terminal
-- Check screen resolution settings
-- Verify Tkinter installation
-
-### Debug Mode
-Run with debug output:
-```bash
-python voice_to_text.py
-```
-Check console for detailed status messages.
-
-## 🤝 Contributing
-
-We welcome contributions! Please feel free to:
-- Report bugs via GitHub Issues
-- Suggest features or improvements
-- Submit pull requests
-- Share usage feedback
+- To stop the app:
+  - Ctrl+Alt+Q (works for both console and hidden)
+  - Or close the console window if running via `.bat`
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see the [LICENSE](LICENSE)
 
-## 🙏 Acknowledgments
+## Notes
 
-- **AssemblyAI** for excellent speech-to-text API
-- **Whispr Flow.ai** for inspiration and feature ideas
-- Python community for amazing libraries (PyAudio, Tkinter, keyboard)
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/davemontore/moneypenny/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/davemontore/moneypenny/discussions)
-- **Documentation**: See `DEBUGGING_REFERENCE.md` for detailed troubleshooting
-
----
-
-**Made with ❤️ for better voice typing experiences**
+- Previous GUI and cloud API features are deprecated in v2.2.0 in favor of a faster, simpler, local workflow.
