@@ -1,0 +1,20 @@
+# Add one term or phrase per line to bias transcription.
+# Lines starting with # are ignored.
+
+# military
+JTAC
+ISR
+CAS
+ROE
+
+# medical
+psilocybin
+ibogaine
+MDMA
+
+# places / names
+Pattaya
+Khost
+Montore
+
+
