@@ -24,16 +24,18 @@
 - Quit: Ctrl+Alt+Q (or close console window)
 
 ## Start automatically at login (optional)
-- Visible console:
+- Visible console (simple):
   - Win+R → type `shell:startup` → Enter
   - Create a shortcut for “MoneyPenny Voice Typing.bat” and move it into the Startup folder
-- Hidden (no console):
-  - Create a file `run_silent.vbs` next to `voice_to_text.py` with:
-    ```vbscript
-    Set WshShell = CreateObject("WScript.Shell")
-    WshShell.Run "cmd /c python voice_to_text.py", 0, False
-    ```
-  - Create a shortcut to `run_silent.vbs` and move it into the Startup folder
+- Hidden (no console window):
+  - In the Startup folder: right‑click → New → Shortcut
+  - In the location box paste:
+    "C:\\Windows\\pyw.exe" -3 "C:\\Users\\Owner\\Documents\\MoneyPenny\\voice_to_text.py"
+  - If that errors, use your installed Python’s `pythonw.exe` instead, for example:
+    "C:\\Users\\Owner\\AppData\\Local\\Programs\\Python\\Python311\\pythonw.exe" "C:\\Users\\Owner\\Documents\\MoneyPenny\\voice_to_text.py"
+  - Name it: MoneyPenny Voice Typing (hidden) → Finish
+  - Right‑click the new shortcut → Properties → set “Start in” to:
+    C:\\Users\\Owner\\Documents\\MoneyPenny
 
 ## Add uncommon words (optional)
 - Edit `lexicon.txt` in the “MoneyPenny” folder

@@ -15,7 +15,7 @@
 - In-memory WAV buffer fed to `WhisperModel.transcribe`
 - Default model: `base.en` on CPU `int8` (configurable)
 - Typing output via `pynput` keyboard controller
-- Startup guidance: use `run_silent.vbs` in Windows Startup for hidden launch
+- Windows startup guidance updated: prefer a Startup shortcut to `pyw.exe`/`pythonw.exe` running `voice_to_text.py` with the project folder as “Start in” (hidden launch, no VBS required)
 
 ### 📦 Dependencies
 - Added: `faster-whisper`

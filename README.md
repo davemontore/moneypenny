@@ -42,15 +42,19 @@
   2) Copy your desktop shortcut for `MoneyPenny Voice Typing.bat` into that folder
 
 - Hidden at login (no console window):
-  1) Create `run_silent.vbs` in the project folder with:
-     ```vbscript
-     Set WshShell = CreateObject("WScript.Shell")
-     WshShell.Run "cmd /c python voice_to_text.py", 0, False
-     ```
-  2) Right‑click `run_silent.vbs` → Create shortcut
-  3) Move that shortcut into the Startup folder (`shell:startup`)
+  1) Press Win+R → type `shell:startup` → press Enter (a folder opens)
+  2) In that folder: right‑click empty space → New → Shortcut
+  3) In “Type the location of the item”, paste:
+     "C:\\Windows\\pyw.exe" -3 "C:\\Users\\Owner\\Documents\\MoneyPenny\\voice_to_text.py"
+     - If this shows an error, your system may not have `pyw.exe`. Use your Python’s `pythonw.exe` instead, for example:
+       "C:\\Users\\Owner\\AppData\\Local\\Programs\\Python\\Python311\\pythonw.exe" "C:\\Users\\Owner\\Documents\\MoneyPenny\\voice_to_text.py"
+  4) Click Next → name it: `MoneyPenny Voice Typing (hidden)` → Finish
+  5) Right‑click the new shortcut → Properties → in “Start in” paste:
+     C:\\Users\\Owner\\Documents\\MoneyPenny
+     → Click OK
+  6) Test by double‑clicking the shortcut: no window should appear. Put the caret in a text field, hold RIGHT CTRL, then release to transcribe. Quit with Ctrl+Alt+Q.
 
-Note: Use either the `.bat` shortcut OR the VBS shortcut in Startup, not both, to avoid launching two copies.
+Note: Keep only one Startup entry (either the `.bat` shortcut or this hidden shortcut) to avoid two copies.
 
 ## ⚙️ Configuration
 
@@ -78,7 +82,6 @@ MoneyPenny/
 ├── voice_to_text.py            # Main application (headless, hotkeys)
 ├── requirements.txt            # Python dependencies
 ├── MoneyPenny Voice Typing.bat # Windows launcher (console)
-├── run_silent.vbs              # Optional hidden launcher (no console)
 ├── CHANGELOG.md                # Version history
 ├── DEBUGGING_REFERENCE.md      # Troubleshooting guide
 └── README.md                   # This file
@@ -138,12 +141,14 @@ These steps avoid any coding or commands. You’ll click and open files like any
    - To stop the app: press Ctrl+Alt+Q (or close the black window if it’s open)
 
 5) Make it start automatically (optional)
-   - Press the Windows key + R → type `shell:startup` → press Enter
-   - In another window, find your “MoneyPenny” folder
-   - Right‑click “MoneyPenny Voice Typing.bat” → “Create shortcut”
-   - Drag that shortcut into the Startup folder you opened
-   - That’s it. Next time you sign in, the app starts for you
-   - Want no black window? See “Hidden at login” instructions above; if that’s confusing, use the AI prompts below
+   - Option A (shows a black window):
+     - Press Windows key + R → type `shell:startup` → Enter
+     - In another window, open your “MoneyPenny” folder
+     - Right‑click “MoneyPenny Voice Typing.bat” → “Create shortcut”
+     - Drag that shortcut into the Startup folder you opened
+     - Next time you sign in, the app starts automatically
+   - Option B (hidden, no window):
+     - Follow the “Hidden at login (no console window)” steps above. It uses `pyw.exe/pythonw.exe` and a shortcut with the correct “Start in” folder.
 
 6) Add uncommon words (optional)
    - In the “MoneyPenny” folder, double‑click `lexicon.txt`
@@ -154,5 +159,5 @@ These steps avoid any coding or commands. You’ll click and open files like any
 
 - “I’m on Windows 11. Help me install Python with ‘Add to PATH’ checked and confirm it’s installed.”
 - “I downloaded `moneypenny` as a ZIP from GitHub. Walk me through extracting it to Documents and running ‘MoneyPenny Voice Typing.bat’.”
-- “Create a `run_silent.vbs` file next to `voice_to_text.py` that starts the app hidden, and help me put a shortcut to it in `shell:startup` so it runs at login.”
+- “Create a Startup shortcut that runs `pyw.exe` (or `pythonw.exe`) with `voice_to_text.py`, set the ‘Start in’ folder to my MoneyPenny folder, and place it in `shell:startup` so it runs hidden at login.”
 - “I want to add words to improve transcription. Show me how to edit `lexicon.txt`, save it, and restart the app.”
