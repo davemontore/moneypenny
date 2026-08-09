@@ -1,19 +1,21 @@
 # MoneyPenny - Voice Typing Assistant
 
-> A fast, local voice‑to‑text utility. Hold RIGHT CTRL to dictate, release to transcribe into the current text field.
+> A fast voice‑to‑text utility for Windows. Hold RIGHT CTRL to dictate, release to transcribe into the current text field.
 
 ## ✨ Features
 
-- **Local transcription**: Uses `faster-whisper` (no cloud, low latency)
 - **Hold‑to‑record**: Press and hold RIGHT CTRL, release to transcribe
 - **Types into any app**: Output is typed into the focused window
-- **Headless**: No GUI; runs quietly in the background
-- **Quick exit**: Press Ctrl+Alt+Q (or ESC in console) to quit
- - **Lexicon biasing**: Add your own terms in `lexicon.txt` to bias transcription
+- **Cloud or local transcription**: Cloud mode (Groq or OpenRouter) is fast and accurate; Local mode (faster-whisper) works offline. Choose in the Settings tab.
+- **Settings window + system tray**: A simple GUI with Settings, Dictionary, and Status tabs. Closing the window hides it to the tray so it keeps listening.
+- **Custom dictionary**: Add names, jargon, and uncommon words (Dictionary tab or `lexicon.txt`) to improve recognition
+- **Quick exit**: Press Ctrl+Alt+Q, or right‑click the tray icon → Exit
+- **One copy at a time**: Launching a second copy just reminds you it's already running
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+- Windows 10/11 with a microphone
 - Python 3.8 or higher
 
 ### Installation
@@ -25,15 +27,19 @@
    pip install -r requirements.txt
    ```
 
-2. Start the app (choose one):
-   - Console: `python voice_to_text.py`
-   - Double‑click: `MoneyPenny Voice Typing.bat`
+2. Start the app:
+   - Double‑click `MoneyPenny Voice Typing.bat` (recommended), or run `python voice_to_text.py`
+   - The settings window opens, and an icon appears in the system tray (near the clock)
 
-3. Use it:
+3. First‑run setup (choose one):
+   - **Cloud mode (recommended, fastest)**: Get a free API key at `console.groq.com`, then in the app's Settings tab set Transcription Mode = Cloud, Provider = Groq, paste the key, and click Save Settings
+   - **Local mode (offline)**: No setup needed — the speech model downloads automatically on first run (takes a minute), then it's ready
+
+4. Use it:
    - Place the cursor in any text field
    - Hold RIGHT CTRL to dictate
    - Release to transcribe; text will be typed automatically
-   - Quit: Ctrl+Alt+Q (or ESC if running in console)
+   - Note: closing the window does NOT quit the app — it hides to the tray. To quit: Ctrl+Alt+Q or right‑click the tray icon → Exit
 
 ### Start automatically at login
 
@@ -58,32 +64,41 @@ Note: Keep only one Startup entry (either the `.bat` shortcut or this hidden sho
 
 ## ⚙️ Configuration
 
-- Default model: `base.en` on CPU (`int8`) for a good speed/accuracy balance
-- Faster option: set `MODEL_SIZE = "tiny.en"` in `voice_to_text.py`
-- GPU option: change model init to `device="cuda", compute_type="float16"`
- - Lexicon: create `lexicon.txt` (one term/phrase per line). Example:
-   ```
-   # military terms
-   JTAC
-   ISR
-   CAS
-   # medical
-   psilocybin
-   ibogaine
-   # places
-   Pattaya
-   Khost
-   ```
+All settings live in the app's **Settings tab** (double‑click the tray icon to open the window):
+
+- **Transcription Mode**: Cloud (fast, needs internet + API key) or Local (offline, slower)
+- **Cloud Provider**: Groq (usually fastest) or OpenRouter, with separate API key and model fields for each
+- **Local Model**: `tiny.en` (fastest) or `base.en` (more accurate) — used in Local mode
+- **Microphone**: System default or a specific device
+- **Record Hotkey**: RIGHT CTRL by default; several alternatives available (a change takes effect after restarting the app)
+
+Custom words: use the **Dictionary tab**, or edit `lexicon.txt` directly (one term/phrase per line). Example:
+
+```
+# military terms
+JTAC
+ISR
+CAS
+# medical
+psilocybin
+ibogaine
+# places
+Pattaya
+Khost
+```
 
 ## 📁 Project Structure
 
 ```
 MoneyPenny/
-├── voice_to_text.py            # Main application (headless, hotkeys)
+├── voice_to_text.py            # Main application (recording, hotkeys, transcription)
+├── gui.py                      # Settings window and system tray
 ├── requirements.txt            # Python dependencies
-├── MoneyPenny Voice Typing.bat # Windows launcher (console)
+├── MoneyPenny Voice Typing.bat # Windows launcher (recommended)
+├── MoneyPenny Headless.bat     # Console-mode launcher (no GUI)
+├── lexicon.txt                 # Custom dictionary (one term per line)
 ├── CHANGELOG.md                # Version history
-├── DEBUGGING_REFERENCE.md      # Troubleshooting guide
+├── QuickStart-CheatSheet.md    # One-page usage reference
 └── README.md                   # This file
 ```
 
@@ -95,9 +110,13 @@ MoneyPenny/
   - Make sure the text caret is in a text field
   - Check microphone default device and levels in Windows
 
+- The window closed but the app seems to still be running:
+  - That's by design — closing the window hides the app to the system tray so it keeps listening
+  - To quit fully: Ctrl+Alt+Q, or right‑click the tray icon → Exit
+
 - To stop the app:
-  - Ctrl+Alt+Q (works for both console and hidden)
-  - Or close the console window if running via `.bat`
+  - Ctrl+Alt+Q (works in every mode)
+  - Or right‑click the tray icon → Exit
 
 - Logs (for crash diagnosis):
   - A detailed log file is written to `logs/moneypenny.log` next to `voice_to_text.py`.
@@ -107,10 +126,6 @@ MoneyPenny/
 ## 📄 License
 
 MIT License - see the [LICENSE](LICENSE)
-
-## Notes
-
-- Previous GUI and cloud API features are deprecated in v2.2.0 in favor of a faster, simpler, local workflow.
 
 ---
 
@@ -136,16 +151,21 @@ These steps avoid any coding or commands. You’ll click and open files like any
 3) Start the app
    - Open the “MoneyPenny” folder
    - Double‑click “MoneyPenny Voice Typing.bat”
-   - The first run will download the voice model (takes a minute). When you see “Whisper model loaded.” it’s ready
+   - A settings window opens, and a small icon appears near the clock (the system tray)
    - If Windows warns you (SmartScreen), click “More info” → “Run anyway”
 
-4) Use it
+4) Choose how it transcribes (one time)
+   - **Recommended — Cloud (fastest):** go to `https://console.groq.com`, sign up free, create an API key. In the app's Settings tab: Transcription Mode = Cloud, Provider = Groq, paste the key, click Save Settings
+   - **Or — Local (offline, slower):** nothing to do; the first run downloads the voice model automatically (takes a minute)
+
+5) Use it
    - Click into any text field (Notepad, email, browser)
    - Hold the RIGHT CTRL key while you speak
    - Release RIGHT CTRL to finish; your words will appear
-   - To stop the app: press Ctrl+Alt+Q (or close the black window if it’s open)
+   - Important: closing the window does NOT quit the app — it hides to the tray so it can keep listening
+   - To quit fully: press Ctrl+Alt+Q, or right‑click the tray icon → Exit
 
-5) Make it start automatically (optional)
+6) Make it start automatically (optional)
    - Option A (shows a black window):
      - Press Windows key + R → type `shell:startup` → Enter
      - In another window, open your “MoneyPenny” folder
@@ -155,10 +175,9 @@ These steps avoid any coding or commands. You’ll click and open files like any
    - Option B (hidden, no window):
      - Follow the “Hidden at login (no console window)” steps above. It uses `pyw.exe/pythonw.exe` and a shortcut with the correct “Start in” folder.
 
-6) Add uncommon words (optional)
-   - In the “MoneyPenny” folder, double‑click `lexicon.txt`
-   - Type one word or phrase per line (e.g., names, medical terms)
-   - Save the file and restart the app
+7) Add uncommon words (optional)
+   - Open the app's Dictionary tab, type a word, click Add
+   - (Or edit `lexicon.txt` in the “MoneyPenny” folder — one word or phrase per line — then restart the app)
 
 ### Copy‑and‑paste prompts for an AI helper (optional)
 

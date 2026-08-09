@@ -1,5 +1,22 @@
 # Voice Typing App - Changelog
 
+## Version 3.0 - GUI Returns, Cloud Transcription, Custom Dictionary
+*Released: August 2026*
+
+### 🚀 Core Changes
+- Settings window (CustomTkinter) with system tray integration: Settings, Dictionary, and Status tabs
+- Cloud transcription via Groq (`whisper-large-v3-turbo`) or OpenRouter (`openai/gpt-transcribe`); Local mode (faster-whisper) remains as the offline option
+- Dictionary tab manages custom vocabulary (stored in `lexicon.txt`, used to bias transcription in both modes)
+- Closing the window hides the app to the tray; quit via Ctrl+Alt+Q or tray menu
+- Single-instance protection via Windows named mutex (launching a second copy shows an explanatory message and exits)
+
+### 🔧 Technical Notes
+- `gui.py` holds all window/tray code; `voice_to_text.py` falls back to headless mode if the GUI fails to load
+- Trailing-silence trimming and stock-phrase filtering reduce Whisper hallucinations
+- Settings stored in `settings.json` (contains API keys — deliberately NOT tracked in git)
+
+---
+
 ## Version 2.2.0 - Local Faster-Whisper, Headless, Hold-to-Record
 *Released: August 2025*
 
