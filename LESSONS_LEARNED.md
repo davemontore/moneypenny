@@ -4,6 +4,16 @@ Reusable lessons from building MoneyPenny. Newest first.
 
 ---
 
+## 2026-08-09 — Test a desktop app through its real entry point
+
+A visible GUI does not mean the GUI module is the program Windows launches. MoneyPenny's process starts from `voice_to_text.py`, which owns the application lifecycle and imports the window and tray components from `gui.py`. Therefore, Windows correctly identifies the running command as `voice_to_text.py` even while the settings window is visible.
+
+Launching `gui.py` directly was an invalid startup test: that file defines GUI classes but has no application entry point, so exiting immediately was expected rather than evidence of a defect. A second launch can also exit correctly when the single-instance lock detects the already-running app.
+
+Reusable process: trace **launcher → entry script → mode flags → imported UI** before testing. Exercise the same command the user actually runs, account for single-instance protection, and do not diagnose an expected exit as a startup failure.
+
+---
+
 ## 2026-08-09 — Audit the fresh-user journey, not only the current working copy
 
 The first cleanup correctly removed dead code and exposed credentials, but it still judged installation mostly from a machine where MoneyPenny already worked. A clean GitHub download exposed stale instructions, machine-specific paths, unpinned component versions, a launcher that installed globally every time, and a personal dictionary being treated as project content.
