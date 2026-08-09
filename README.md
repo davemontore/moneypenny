@@ -99,6 +99,11 @@ MoneyPenny/
   - Ctrl+Alt+Q (works for both console and hidden)
   - Or close the console window if running via `.bat`
 
+- Logs (for crash diagnosis):
+  - A detailed log file is written to `logs/moneypenny.log` next to `voice_to_text.py`.
+  - After a crash, open that file and review the last 100 lines.
+  - If you need help, share those last 100 lines here so we can pinpoint the cause.
+
 ## 📄 License
 
 MIT License - see the [LICENSE](LICENSE)

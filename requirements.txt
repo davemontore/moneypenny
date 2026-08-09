@@ -1,9 +1,13 @@
+# Core audio and transcription
 pyaudio
 keyboard
 pynput
-assemblyai
-requests
-cryptography
-win10toast
-psutil
 faster-whisper
+
+# Cloud transcription (Groq hosted Whisper)
+requests
+
+# GUI (v3.0)
+customtkinter
+pystray
+Pillow

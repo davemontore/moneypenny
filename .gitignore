@@ -35,10 +35,14 @@ ENV/
 *.swo
 
 # Voice Typing App Specific
-settings.json          # Contains encrypted API key
-encryption.key         # Encryption key for settings
-temp_audio_*.wav      # Temporary audio files
-voice_to_text.lock    # Process lock file
+# NOTE: gitignore does not support inline comments — each rule must be
+# on its own line, with any comment on a separate line above it.
+
+# Contains API keys — never commit
+settings.json
+
+# Legacy file (encryption removed in v2.2+); kept ignored so it isn't re-committed
+encryption.key
 
 # Windows
 Thumbs.db
