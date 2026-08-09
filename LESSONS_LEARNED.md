@@ -4,6 +4,22 @@ Reusable lessons from building MoneyPenny. Newest first.
 
 ---
 
+## 2026-08-09 — Audit the fresh-user journey, not only the current working copy
+
+The first cleanup correctly removed dead code and exposed credentials, but it still judged installation mostly from a machine where MoneyPenny already worked. A clean GitHub download exposed stale instructions, machine-specific paths, unpinned component versions, a launcher that installed globally every time, and a personal dictionary being treated as project content.
+
+Reusable process:
+
+1. Enumerate every tracked file, including launchers, old documents, examples, and archives—not just source code.
+2. Clone or copy only tracked files into a clean folder and follow the public instructions literally.
+3. Treat editable dictionaries, settings, histories, and caches as user data even when they contain no passwords. Ship a safe example; keep the live file untracked.
+4. Make the normal launcher use the same tested, isolated environment as the installer so development success and user success do not diverge.
+5. Search documentation for absolute user paths, obsolete version numbers, and descriptions of superseded behavior before calling an audit complete.
+
+The key lesson is that “the code runs here” and “the project is ready for someone else” are different acceptance tests.
+
+---
+
 ## 2026-08-09 — Secrets in git: .gitignore can't fix a file that's already committed (and dot-files don't hide anything from git)
 
 Found during a code audit: `settings.json` was listed in `.gitignore` AND tracked in git — with live API keys inside, synced to a public GitHub repo. Two misconceptions collided:

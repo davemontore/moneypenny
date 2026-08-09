@@ -1,8 +1,4 @@
-"""
-MoneyPenny - Voice Typing Assistant v3.0
-Local voice-to-text with streaming transcription and GUI.
-Hold RIGHT CTRL to dictate, release to transcribe into the current text field.
-"""
+"""MoneyPenny v3.0 — cloud or local voice typing for Windows."""
 
 import pyaudio
 import keyboard
@@ -266,7 +262,7 @@ class Lexicon:
 
 
 class Transcriber:
-    """Handles Whisper model loading and transcription."""
+    """Handles local Whisper and cloud transcription."""
 
     def __init__(self, settings: Settings, lexicon: Lexicon):
         self.settings = settings
@@ -702,7 +698,7 @@ class MoneyPennyApp:
                 pass
 
     def run_headless(self):
-        """Run without GUI (original behavior)."""
+        """Run without the settings window or system tray."""
         logger.info("MoneyPenny starting up (headless mode).")
         # No GUI to show progress, so load the model now (blocking).
         self.transcriber.load_model()
@@ -776,7 +772,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="MoneyPenny Voice Typing")
     parser.add_argument("--headless", action="store_true",
-                       help="Run without GUI (original behavior)")
+                       help="Run without the settings window or system tray")
     args = parser.parse_args()
 
     instance_lock = _acquire_single_instance_lock()

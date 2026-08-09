@@ -1,13 +1,13 @@
 # Core audio and transcription
-pyaudio
-keyboard
-pynput
-faster-whisper
+pyaudio==0.2.14
+keyboard==0.13.5
+pynput==1.8.2
+faster-whisper==1.2.1
 
 # Cloud transcription (Groq hosted Whisper)
-requests
+requests==2.34.2
 
 # GUI (v3.0)
-customtkinter
-pystray
-Pillow
+customtkinter==6.0.0
+pystray==0.19.5
+Pillow==12.3.0

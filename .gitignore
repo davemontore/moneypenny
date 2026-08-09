@@ -22,8 +22,8 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
-
-# Virtual Environment
+# Virtual environments (created by Install MoneyPenny.bat)
+.venv/
 venv/
 env/
 ENV/
@@ -40,6 +40,9 @@ ENV/
 
 # Contains API keys — never commit
 settings.json
+
+# Personal dictionary — never publish user vocabulary
+lexicon.txt
 
 # Legacy file (encryption removed in v2.2+); kept ignored so it isn't re-committed
 encryption.key

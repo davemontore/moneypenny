@@ -802,8 +802,7 @@ class MoneyPennyGUI:
 
     def run(self):
         """Run the GUI main loop."""
-        # Start hidden (in tray)
-        # Show window on first run for user to see it
+        # Show the window at startup; closing it later hides it to the tray.
         self.create_window()
         if self.window:
             self.window.mainloop()

@@ -14,6 +14,8 @@
 - `gui.py` holds all window/tray code; `voice_to_text.py` falls back to headless mode if the GUI fails to load
 - Trailing-silence trimming and stock-phrase filtering reduce Whisper hallucinations
 - Settings stored in `settings.json` (contains API keys — deliberately NOT tracked in git)
+- One-click Windows setup creates a private `.venv` with tested dependency versions; both launchers use it
+- Personal `lexicon.txt` contents are no longer tracked; setup creates the file from a safe example without overwriting an existing dictionary
 
 ---
 

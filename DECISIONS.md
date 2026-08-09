@@ -4,6 +4,18 @@ Significant project decisions, with date, reason, and practical consequence.
 
 ---
 
+## 2026-08-09 — Installation is isolated and user data stays local
+
+**Decision:** MoneyPenny now installs tested component versions into a private `.venv` folder through `Install MoneyPenny.bat`. Both launchers use that environment. `settings.json` and `lexicon.txt` are local user data and are excluded from Git; a public `lexicon.example.txt` provides a safe starter.
+
+**Reason:** A fresh GitHub ZIP previously depended on users knowing how to run `pip`, modified whichever Python installation happened to be active, and publicly included one user's dictionary. A shared app should be reproducible without publishing or overwriting personal data.
+
+**Alternatives considered:** Continue installing globally from the headless launcher (easy to drift and can affect other Python tools); package a standalone `.exe` now (larger release process and not required for this milestone).
+
+**Practical consequence:** A friend installs or repairs MoneyPenny by double-clicking one file. The first setup takes longer and uses disk space inside `.venv`, but it does not alter other Python projects. Existing personal dictionaries are preserved.
+
+---
+
 ## 2026-08-08 — Groq added as a cloud transcription provider (CORRECTED)
 
 **Decision:** Groq was added to MoneyPenny as a cloud provider option alongside OpenRouter, using the `whisper-large-v3-turbo` model.

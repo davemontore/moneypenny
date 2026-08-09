@@ -16,22 +16,17 @@
 
 ### Prerequisites
 - Windows 10/11 with a microphone
-- Python 3.8 or higher
+- Python 3.10, 3.11, 3.12, or 3.13 from [python.org](https://www.python.org/downloads/windows/)
 
 ### Installation
 
-1. Clone and install dependencies:
-   ```bash
-   git clone https://github.com/davemontore/moneypenny.git
-   cd moneypenny
-   pip install -r requirements.txt
-   ```
+1. Download the project from GitHub with **Code → Download ZIP**, then choose **Extract All**. Do not run it from inside the ZIP.
+2. Open the extracted folder and double-click `MoneyPenny Voice Typing.bat`.
+   - The first launch installs MoneyPenny's tested components inside its own folder. This can take several minutes.
+   - Later launches open the settings window directly and place an icon in the system tray near the clock.
+   - You can also double-click `Install MoneyPenny.bat` to install or repair the components without starting the app.
 
-2. Start the app:
-   - Double‑click `MoneyPenny Voice Typing.bat` (recommended), or run `python voice_to_text.py`
-   - The settings window opens, and an icon appears in the system tray (near the clock)
-
-3. First‑run setup (choose one):
+3. In MoneyPenny, choose how to transcribe:
    - **Cloud mode (recommended, fastest)**: Get a free API key at `console.groq.com`, then in the app's Settings tab set Transcription Mode = Cloud, Provider = Groq, paste the key, and click Save Settings
    - **Local mode (offline)**: No setup needed — the speech model downloads automatically on first run (takes a minute), then it's ready
 
@@ -43,24 +38,12 @@
 
 ### Start automatically at login
 
-- Console visible at login (simple):
-  1) Press Win+R → `shell:startup` → Enter
-  2) Copy your desktop shortcut for `MoneyPenny Voice Typing.bat` into that folder
+1. Right-click `MoneyPenny Voice Typing.bat` and choose **Create shortcut**.
+2. Press Win+R, enter `shell:startup`, and press Enter.
+3. Move the new shortcut into the folder that opens.
+4. Test the shortcut by double-clicking it. MoneyPenny should open without a black console window.
 
-- Hidden at login (no console window):
-  1) Press Win+R → type `shell:startup` → press Enter (a folder opens)
-  2) In that folder: right‑click empty space → New → Shortcut
-  3) In “Type the location of the item”, paste:
-     "C:\\Windows\\pyw.exe" -3 "C:\\Users\\Owner\\Documents\\MoneyPenny\\voice_to_text.py"
-     - If this shows an error, your system may not have `pyw.exe`. Use your Python’s `pythonw.exe` instead, for example:
-       "C:\\Users\\Owner\\AppData\\Local\\Programs\\Python\\Python311\\pythonw.exe" "C:\\Users\\Owner\\Documents\\MoneyPenny\\voice_to_text.py"
-  4) Click Next → name it: `MoneyPenny Voice Typing (hidden)` → Finish
-  5) Right‑click the new shortcut → Properties → in “Start in” paste:
-     C:\\Users\\Owner\\Documents\\MoneyPenny
-     → Click OK
-  6) Test by double‑clicking the shortcut: no window should appear. Put the caret in a text field, hold RIGHT CTRL, then release to transcribe. Quit with Ctrl+Alt+Q.
-
-Note: Keep only one Startup entry (either the `.bat` shortcut or this hidden shortcut) to avoid two copies.
+Keep only one MoneyPenny shortcut in the Startup folder. Remove it whenever you no longer want MoneyPenny to start at login.
 
 ## ⚙️ Configuration
 
@@ -72,19 +55,13 @@ All settings live in the app's **Settings tab** (double‑click the tray icon to
 - **Microphone**: System default or a specific device
 - **Record Hotkey**: RIGHT CTRL by default; several alternatives available (a change takes effect after restarting the app)
 
-Custom words: use the **Dictionary tab**, or edit `lexicon.txt` directly (one term/phrase per line). Example:
+Custom words: use the **Dictionary tab**, or edit your private `lexicon.txt` file directly (one term or phrase per line). The file remains on your computer and is not uploaded to GitHub. Example:
 
 ```
-# military terms
-JTAC
-ISR
-CAS
-# medical
-psilocybin
-ibogaine
-# places
-Pattaya
-Khost
+# organization
+Acme Corporation
+# project
+Project Skylark
 ```
 
 ## 📁 Project Structure
@@ -93,10 +70,11 @@ Khost
 MoneyPenny/
 ├── voice_to_text.py            # Main application (recording, hotkeys, transcription)
 ├── gui.py                      # Settings window and system tray
+├── Install MoneyPenny.bat      # One-click setup and repair
 ├── requirements.txt            # Python dependencies
 ├── MoneyPenny Voice Typing.bat # Windows launcher (recommended)
-├── MoneyPenny Headless.bat     # Console-mode launcher (no GUI)
-├── lexicon.txt                 # Custom dictionary (one term per line)
+├── MoneyPenny Headless.bat     # Launcher without settings window/tray
+├── lexicon.example.txt         # Safe starter for the private dictionary
 ├── CHANGELOG.md                # Version history
 ├── QuickStart-CheatSheet.md    # One-page usage reference
 └── README.md                   # This file
@@ -109,6 +87,14 @@ MoneyPenny/
   - Try running the console as Administrator (hotkeys may need elevation)
   - Make sure the text caret is in a text field
   - Check microphone default device and levels in Windows
+
+- Setup says Python is missing or unsupported:
+  - Install Python 3.10 through 3.13 from python.org and check **Add Python to PATH** in its installer
+  - Then double-click `Install MoneyPenny.bat` again
+
+- Setup fails while installing components:
+  - Make sure the computer is online, then double-click `Install MoneyPenny.bat` again
+  - The setup changes only the `.venv` folder inside MoneyPenny; delete that folder and rerun setup if a repair is needed
 
 - The window closed but the app seems to still be running:
   - That's by design — closing the window hides the app to the system tray so it keeps listening
@@ -139,7 +125,7 @@ These steps avoid any coding or commands. You’ll click and open files like any
 
 1) Install Python
    - Go to `https://www.python.org/downloads/`
-   - Click “Download Python 3.x”
+   - Install Python 3.10, 3.11, 3.12, or 3.13
    - In the installer: check “Add Python to PATH”, then click “Install Now”
 
 2) Get the app
@@ -151,6 +137,7 @@ These steps avoid any coding or commands. You’ll click and open files like any
 3) Start the app
    - Open the “MoneyPenny” folder
    - Double‑click “MoneyPenny Voice Typing.bat”
+   - The first launch sets up MoneyPenny inside its own folder; wait for the setup window to say it is complete
    - A settings window opens, and a small icon appears near the clock (the system tray)
    - If Windows warns you (SmartScreen), click “More info” → “Run anyway”
 
@@ -166,14 +153,12 @@ These steps avoid any coding or commands. You’ll click and open files like any
    - To quit fully: press Ctrl+Alt+Q, or right‑click the tray icon → Exit
 
 6) Make it start automatically (optional)
-   - Option A (shows a black window):
-     - Press Windows key + R → type `shell:startup` → Enter
-     - In another window, open your “MoneyPenny” folder
-     - Right‑click “MoneyPenny Voice Typing.bat” → “Create shortcut”
-     - Drag that shortcut into the Startup folder you opened
-     - Next time you sign in, the app starts automatically
-   - Option B (hidden, no window):
-     - Follow the “Hidden at login (no console window)” steps above. It uses `pyw.exe/pythonw.exe` and a shortcut with the correct “Start in” folder.
+   - Press Windows key + R → type `shell:startup` → Enter
+   - In another window, open your “MoneyPenny” folder
+   - Right‑click “MoneyPenny Voice Typing.bat” → “Create shortcut”
+   - Drag that shortcut into the Startup folder you opened
+   - Next time you sign in, the app starts automatically
+   - The launcher opens MoneyPenny without a black console window after setup is complete
 
 7) Add uncommon words (optional)
    - Open the app's Dictionary tab, type a word, click Add
@@ -183,5 +168,5 @@ These steps avoid any coding or commands. You’ll click and open files like any
 
 - “I’m on Windows 11. Help me install Python with ‘Add to PATH’ checked and confirm it’s installed.”
 - “I downloaded `moneypenny` as a ZIP from GitHub. Walk me through extracting it to Documents and running ‘MoneyPenny Voice Typing.bat’.”
-- “Create a Startup shortcut that runs `pyw.exe` (or `pythonw.exe`) with `voice_to_text.py`, set the ‘Start in’ folder to my MoneyPenny folder, and place it in `shell:startup` so it runs hidden at login.”
+- “Help me create a shortcut to `MoneyPenny Voice Typing.bat` and put it in my Windows `shell:startup` folder.”
 - “I want to add words to improve transcription. Show me how to edit `lexicon.txt`, save it, and restart the app.”

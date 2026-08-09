@@ -1,0 +1,8 @@
+# MoneyPenny personal dictionary
+# Add one name, term, or phrase per line. Lines starting with # are ignored.
+# MoneyPenny creates lexicon.txt from this file during setup.
+# lexicon.txt stays on this computer and is not uploaded to GitHub.
+
+# Example terms (remove the # to use them):
+# Acme Corporation
+# Project Skylark
