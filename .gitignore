@@ -44,6 +44,9 @@ settings.json
 # Personal dictionary — never publish user vocabulary
 lexicon.txt
 
+# Private captured-transcript history
+transcript_history.jsonl
+
 # Legacy file (encryption removed in v2.2+); kept ignored so it isn't re-committed
 encryption.key
 

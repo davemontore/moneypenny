@@ -77,6 +77,10 @@ The v2.2.1 startup instructions originally used a VBS script to launch the app w
 - CustomTkinter resets the window icon ~200ms after creation — re-apply `iconbitmap` with `window.after(400, ...)`.
 - IPropertyStore `IPersistFile.Load` must use mode 2 (read-write); mode 0 gives STG_E_ACCESSDENIED on Save.
 
+### 2026-08-12 follow-up — shortcut identity was not sufficient on this Windows build
+
+The matching shortcut icon and AppUserModelID could both be verified while the live taskbar button still displayed Python. Windows continued grouping the Tk window under `pythonw.exe`. The durable result required building a windowed `MoneyPenny.exe` with `moneypenny.ico` embedded, pointing both shortcuts at that executable, and retaining the matching `MoneyPenny.VoiceTyping` AppUserModelID. Verify success from the visible taskbar or Windows UI Automation—shortcut metadata alone is not an end-to-end test.
+
 ---
 
 ## 2026-08-08 — Tray-app "close vs quit" must be obvious

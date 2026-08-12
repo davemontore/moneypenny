@@ -7,34 +7,48 @@
 - **Hold‑to‑record**: Press and hold RIGHT CTRL, release to transcribe
 - **Types into any app**: Output is typed into the focused window
 - **Cloud or local transcription**: Cloud mode (Groq or OpenRouter) is fast and accurate; Local mode (faster-whisper) works offline. Choose in the Settings tab.
-- **Settings window + system tray**: A simple GUI with Settings, Dictionary, and Status tabs. Closing the window hides it to the tray so it keeps listening.
+- **Selective context-aware cleanup**: Normal dictation stays on the fast single-request path; a Groq language-model pass runs only when verbal punctuation is detected and preserves literal phrases such as "the word comma"
+- **Settings window + system tray**: A GUI with Settings, Dictionary, History, and Status tabs. Closing the window hides it to the tray so it keeps listening.
 - **Custom dictionary**: Add names, jargon, and uncommon words (Dictionary tab or `lexicon.txt`) to improve recognition
-- **Quick exit**: Press Ctrl+Alt+Q, or right‑click the tray icon → Exit
+- **Captured transcript history**: Review raw and cleaned transcripts locally in the History tab
+- **Spoken punctuation**: Say commands such as `comma`, `question mark`, `new line`, or `quote ... quote`; see the reference in the Dictionary tab
+- **Quick exit**: Press Ctrl+Alt+Q, or right-click the tray icon → Exit
 - **One copy at a time**: Launching a second copy just reminds you it's already running
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Windows 10/11 with a microphone
-- Python 3.10, 3.11, 3.12, or 3.13 from [python.org](https://www.python.org/downloads/windows/)
+### Install the Windows app (recommended)
 
-### Installation
+1. Open the repository's [**Releases** page](https://github.com/davemontore/moneypenny/releases) and download `MoneyPenny-Windows-x64.zip` from the newest release.
+2. Choose **Extract All**. Do not run MoneyPenny from inside the ZIP.
+3. Open the extracted folder and double-click `MoneyPenny.exe`.
+4. Optionally run `Create MoneyPenny Shortcuts.bat` to add branded Start Menu and taskbar shortcuts.
 
-1. Download the project from GitHub with **Code → Download ZIP**, then choose **Extract All**. Do not run it from inside the ZIP.
-2. Open the extracted folder and double-click `MoneyPenny Voice Typing.bat`.
-   - The first launch installs MoneyPenny's tested components inside its own folder. This can take several minutes.
-   - Later launches open the settings window directly and place an icon in the system tray near the clock.
-   - You can also double-click `Install MoneyPenny.bat` to install or repair the components without starting the app.
+This route needs only Windows 10/11 and a microphone—Python is already included in the release.
 
-3. In MoneyPenny, choose how to transcribe:
+### Install from source (developers and contributors)
+
+1. Install Python 3.10, 3.11, 3.12, or 3.13 from [python.org](https://www.python.org/downloads/windows/).
+2. Download the source with **Code → Download ZIP** and choose **Extract All**, or clone the repository with Git.
+3. Open the project folder and double-click `Install MoneyPenny.bat`.
+   - Setup creates a private `.venv`, installs pinned dependencies, runs checks, and builds the branded `dist\MoneyPenny\MoneyPenny.exe`.
+   - Setup creates branded Start Menu and taskbar shortcuts and refreshes Explorer once.
+   - Later launches can use the taskbar shortcut or `MoneyPenny Voice Typing.bat`.
+   - Run `Fix MoneyPenny Taskbar Icon.bat` to rebuild the executable and refresh its shortcuts after icon-related changes.
+
+### First run
+
+1. In MoneyPenny, choose how to transcribe:
    - **Cloud mode (recommended, fastest)**: Get a free API key at `console.groq.com`, then in the app's Settings tab set Transcription Mode = Cloud, Provider = Groq, paste the key, and click Save Settings
    - **Local mode (offline)**: No setup needed — the speech model downloads automatically on first run (takes a minute), then it's ready
 
-4. Use it:
+2. Use it:
    - Place the cursor in any text field
    - Hold RIGHT CTRL to dictate
    - Release to transcribe; text will be typed automatically
-   - Note: closing the window does NOT quit the app — it hides to the tray. To quit: Ctrl+Alt+Q or right‑click the tray icon → Exit
+   - For quoted text, say `quote this is quoted quote`; MoneyPenny types `"this is quoted"`
+   - When discussing punctuation itself, use natural context such as `the word comma` or `a comma`
+   - Note: closing the window does NOT quit the app — it hides to the tray. To quit: Ctrl+Alt+Q or right-click the tray icon → Exit
 
 ### Start automatically at login
 
@@ -51,6 +65,7 @@ All settings live in the app's **Settings tab** (double‑click the tray icon to
 
 - **Transcription Mode**: Cloud (fast, needs internet + API key) or Local (offline, slower)
 - **Cloud Provider**: Groq (usually fastest) or OpenRouter, with separate API key and model fields for each
+- **AI Transcript Cleanup**: `Commands only` (default) invokes `llama-3.1-8b-instant` only for likely verbal punctuation; `Off` never invokes it and `Always` cleans every transcript
 - **Local Model**: `tiny.en` (fastest) or `base.en` (more accurate) — used in Local mode
 - **Microphone**: System default or a specific device
 - **Record Hotkey**: RIGHT CTRL by default; several alternatives available (a change takes effect after restarting the app)
@@ -64,6 +79,8 @@ Acme Corporation
 Project Skylark
 ```
 
+Captured transcripts are stored locally in `transcript_history.jsonl`, shown in the **History** tab, and excluded from Git.
+
 ## 📁 Project Structure
 
 ```
@@ -71,12 +88,16 @@ MoneyPenny/
 ├── voice_to_text.py            # Main application (recording, hotkeys, transcription)
 ├── gui.py                      # Settings window and system tray
 ├── Install MoneyPenny.bat      # One-click setup and repair
+├── Build MoneyPenny.exe.bat    # Reproducible branded Windows build
+├── MoneyPenny.spec             # PyInstaller build definition
 ├── requirements.txt            # Python dependencies
+├── requirements-build.txt      # Pinned Windows build dependency
 ├── MoneyPenny Voice Typing.bat # Windows launcher (recommended)
 ├── MoneyPenny Headless.bat     # Launcher without settings window/tray
 ├── lexicon.example.txt         # Safe starter for the private dictionary
 ├── CHANGELOG.md                # Version history
 ├── QuickStart-CheatSheet.md    # One-page usage reference
+├── ROADMAP.md                  # Product and installation direction
 └── README.md                   # This file
 ```
 

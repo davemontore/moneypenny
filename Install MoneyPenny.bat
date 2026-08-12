@@ -41,7 +41,11 @@ if not exist ".venv\Scripts\python.exe" (
 
 echo Installing the tested MoneyPenny components...
 ".venv\Scripts\python.exe" -m pip install --disable-pip-version-check -r requirements.txt
-if errorlevel 1 goto setup_failed
+if errorlevel 1 (
+    echo The default package server failed; trying MoneyPenny's fallback mirror...
+    ".venv\Scripts\python.exe" -m pip install --disable-pip-version-check --index-url https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+    if errorlevel 1 goto setup_failed
+)
 
 if not exist "lexicon.txt" copy /Y "lexicon.example.txt" "lexicon.txt" >nul
 
@@ -51,8 +55,15 @@ if errorlevel 1 goto setup_failed
 ".venv\Scripts\python.exe" -m py_compile voice_to_text.py gui.py
 if errorlevel 1 goto setup_failed
 
+call "Build MoneyPenny.exe.bat" --no-pause
+if errorlevel 1 goto setup_failed
+
+echo Installing the branded MoneyPenny Start Menu and taskbar shortcuts...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Install-MoneyPennyShortcuts.ps1" -RestartExplorer
+if errorlevel 1 goto setup_failed
+
 echo.
-echo Setup complete. Double-click "MoneyPenny Voice Typing.bat" to start.
+echo Setup complete. Launch MoneyPenny from its branded taskbar or Start Menu shortcut.
 if /I not "%~1"=="--no-pause" pause
 exit /b 0
 
