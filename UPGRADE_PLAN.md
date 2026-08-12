@@ -70,7 +70,7 @@ suite and live dictation checklist pass.
 ### Phase 5 — Release candidate
 
 - [ ] Run unit, syntax, dependency, packaging, and secret checks.
-- [ ] Build a private Windows release candidate.
+- [x] Build a private Windows release candidate.
 - [ ] Complete the live acceptance checklist below on this machine.
 - [ ] Review the transcript history for regressions and unexpected replacements.
 - [ ] Publish `v3.1.1` only after every required case passes repeatedly.
@@ -108,4 +108,42 @@ Also verify that no final text contains punctuation collisions such as `:.`,
 - Private candidate 2 packaged and launched from `build/v3.1.1-candidate2`.
 - Candidate loaded seven preferred vocabulary terms and five private correction rules.
 - Active candidate at handoff: PID 12440, Cloud mode, Right Ctrl hotkey.
-- Current checkpoint: live-test Phase 1 while beginning the local spoken-command parser.
+- First two candidate dictations averaged 0.73 seconds (0.70–0.75 seconds),
+  used no cleanup request, and matched the speaker's wording accurately.
+- User feedback at pause: accuracy is good and transcription feels very fast.
+
+## Pause checkpoint — resume here
+
+Repository state:
+
+- Branch: `codex/v3.1.1-correction-pipeline`
+- Phase 1 commit: `e95f378` (`Add deterministic correction pipeline`)
+- Public `v3.1.0` release remains a draft; do not republish it.
+- Private candidate executable:
+  `build/v3.1.1-candidate2/dist/MoneyPenny/MoneyPenny.exe`
+- The candidate is intentionally using the project folder for private settings,
+  vocabulary, corrections, history, and logs.
+
+Working behavior:
+
+- Preferred vocabulary remains a soft transcription hint.
+- Exact corrections are local, deterministic, whole-phrase, longest-first,
+  case-insensitive on input, and preserve exact output spelling/symbols.
+- The live private correction file contains variants for Wispr Flow and C#.
+- `Colin` is present as preferred vocabulary, not as an unconditional correction,
+  because globally replacing `colon` would break the punctuation command.
+- Narrow punctuation-collision repair is active after transcription cleanup.
+- Seventeen tests pass; a 1,000-rule correction benchmark averaged 0.003 ms.
+
+Next-session task order:
+
+1. Read this file and confirm the active branch before editing.
+2. Review fresh transcript history from normal use of candidate 2; preserve the
+   fast Phase 1 behavior if no regressions are present.
+3. Start Phase 2 with tests, not GUI changes: define protected literal phrases
+   and unambiguous local punctuation-command cases.
+4. Implement the local command parser behind a setting or isolated class so it
+   can be tested without replacing the stable candidate immediately.
+5. Do not add an unconditional `colon` → `Colin` correction.
+6. Build candidate 3 only after parser tests pass, then run the five-repeat live
+   acceptance matrix before any push, pull request, tag, or release.
