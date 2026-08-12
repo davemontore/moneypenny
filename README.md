@@ -13,7 +13,6 @@
 - **Captured transcript history**: Review raw and cleaned transcripts locally in the History tab
 - **Spoken punctuation**: Say commands such as `comma`, `question mark`, `new line`, or `quote ... quote`; see the reference in the Dictionary tab
 - **Quick exit**: Press Ctrl+Alt+Q, or right-click the tray icon → Exit
-- **One copy at a time**: Launching a second copy just reminds you it's already running
 
 ## 🚀 Quick Start
 
