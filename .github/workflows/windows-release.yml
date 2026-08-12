@@ -1,0 +1,56 @@
+name: Build Windows release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt -r requirements-build.txt
+
+      - name: Test source
+        run: |
+          python -m unittest discover -s tests -v
+          python -m py_compile voice_to_text.py gui.py
+
+      - name: Build MoneyPenny.exe
+        run: python -m PyInstaller --noconfirm --clean --distpath dist --workpath build/pyinstaller MoneyPenny.spec
+
+      - name: Assemble release folder
+        shell: pwsh
+        run: |
+          Copy-Item README.md, QuickStart-CheatSheet.md, LICENSE, lexicon.example.txt, moneypenny.ico -Destination dist/MoneyPenny
+          Copy-Item Install-MoneyPennyShortcuts.ps1, "Create MoneyPenny Shortcuts.bat" -Destination dist/MoneyPenny
+          Compress-Archive -Path dist/MoneyPenny/* -DestinationPath MoneyPenny-Windows-x64.zip -Force
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: MoneyPenny-Windows-x64
+          path: MoneyPenny-Windows-x64.zip
+          if-no-files-found: error
+
+      - name: Publish tagged GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" MoneyPenny-Windows-x64.zip --title "MoneyPenny ${{ github.ref_name }}" --generate-notes

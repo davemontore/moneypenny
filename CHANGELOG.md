@@ -1,5 +1,24 @@
 # Voice Typing App - Changelog
 
+## Version 3.1 - Context-Aware Cleanup and Transcript History
+*Released: August 2026*
+
+### Core Changes
+- Added a real windowed `MoneyPenny.exe` build with the application icon embedded, preventing Windows from grouping the running app under Python
+- Added a Windows GitHub Actions release pipeline that tests, packages, and publishes a Python-free ZIP for tagged versions
+- Added a repeatable Windows shortcut installer that assigns MoneyPenny's icon and AppUserModelID to its Start Menu and taskbar shortcuts
+- Added selective Groq `llama-3.1-8b-instant` cleanup for context-aware verbal punctuation; the default Commands-only mode leaves ordinary dictation on the original single-request path
+- Cleanup failures and rate limits fall back to the raw transcript so dictation keeps working
+- Added a persistent History tab showing raw and final transcripts, backend, timing, and cleanup status
+- Added a verbal-command reference to the Dictionary tab
+
+### Technical Notes
+- Captured history is stored locally in ignored `transcript_history.jsonl` (maximum 500 entries)
+- Raw and final transcripts are logged separately for reproducible regression diagnosis
+- The cleanup architecture follows established open-source Wispr Flow alternatives such as FreeFlow and Flow
+
+---
+
 ## Version 3.0 - GUI Returns, Cloud Transcription, Custom Dictionary
 *Released: August 2026*
 

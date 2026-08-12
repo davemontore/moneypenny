@@ -33,10 +33,12 @@ class MoneyPennyGUI:
         self.status_label = None
         self.status_detail = None
         self.log_text = None
+        self.history_text = None
         self.recent_activity = []
 
         # Register for status updates
         self.app.add_status_callback(self._on_status_update)
+        self.app.add_history_callback(self._on_history_update)
 
     def create_window(self):
         """Create the main window."""
@@ -62,8 +64,8 @@ class MoneyPennyGUI:
 
         self.window = ctk.CTk()
         self.window.title("MoneyPenny Voice Typing")
-        self.window.geometry("500x450")
-        self.window.minsize(450, 400)
+        self.window.geometry("620x600")
+        self.window.minsize(560, 520)
         self.window.configure(fg_color=BG_COLOR)
 
         # Window + taskbar icon
@@ -86,7 +88,7 @@ class MoneyPennyGUI:
 
         version_label = ctk.CTkLabel(
             header_frame,
-            text="v3.0",
+            text="v3.1",
             font=ctk.CTkFont(family="Segoe UI", size=12),
             text_color="#888888",
         )
@@ -128,6 +130,7 @@ class MoneyPennyGUI:
         # Create tabs
         self._create_settings_tab()
         self._create_dictionary_tab()
+        self._create_history_tab()
         self._create_status_tab()
 
         # Bottom buttons
@@ -325,6 +328,60 @@ class MoneyPennyGUI:
         )
         groq_model_entry.pack(anchor="w", padx=5, pady=(5, 12))
 
+        # --- Context-aware cleanup ---
+        ctk.CTkLabel(
+            container,
+            text="AI Transcript Cleanup",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color=TEXT_COLOR,
+        ).pack(anchor="w", padx=5, pady=(5, 0))
+
+        ctk.CTkLabel(
+            container,
+            text=(
+                "Commands only keeps normal dictation fast and uses a second Groq request only "
+                "when verbal punctuation is detected. Always cleans every transcript."
+            ),
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color="#888888",
+            wraplength=500,
+            justify="left",
+        ).pack(anchor="w", padx=5)
+
+        cleanup_labels = {
+            "off": "Off",
+            "commands": "Commands only",
+            "always": "Always",
+        }
+        self.cleanup_mode_var = ctk.StringVar(
+            value=cleanup_labels.get(
+                self.app.settings.get("cleanup_mode", "commands"),
+                "Commands only",
+            )
+        )
+        cleanup_selector = ctk.CTkSegmentedButton(
+            container,
+            values=["Off", "Commands only", "Always"],
+            variable=self.cleanup_mode_var,
+            selected_color=ACCENT_COLOR,
+            text_color=TEXT_COLOR,
+        )
+        cleanup_selector.pack(anchor="w", padx=5, pady=(5, 8))
+
+        self.cleanup_model_var = ctk.StringVar(
+            value=self.app.settings.get("cleanup_model", "llama-3.1-8b-instant")
+        )
+        cleanup_model_entry = ctk.CTkEntry(
+            container,
+            textvariable=self.cleanup_model_var,
+            placeholder_text="llama-3.1-8b-instant",
+            fg_color=BG_COLOR,
+            border_color=BUTTON_COLOR,
+            text_color=TEXT_COLOR,
+            width=330,
+        )
+        cleanup_model_entry.pack(anchor="w", padx=5, pady=(0, 12))
+
         # --- OpenRouter API key ---
         ctk.CTkLabel(
             container,
@@ -487,27 +544,31 @@ class MoneyPennyGUI:
         save_btn.pack(pady=15)
 
     def _create_dictionary_tab(self):
-        """Create the Dictionary tab."""
+        """Create the Dictionary tab with vocabulary and verbal-command help."""
         tab = self.tabview.add("Dictionary")
         tab.configure(fg_color=BG_COLOR)
 
+        container = ctk.CTkScrollableFrame(tab, fg_color=BG_COLOR)
+        container.pack(fill="both", expand=True, padx=5, pady=5)
+
         ctk.CTkLabel(
-            tab,
+            container,
             text="Custom Words & Phrases",
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             text_color=TEXT_COLOR,
         ).pack(anchor="w", padx=10, pady=(10, 0))
 
         ctk.CTkLabel(
-            tab,
+            container,
             text="These words are used to improve transcription accuracy",
             font=ctk.CTkFont(family="Segoe UI", size=11),
             text_color="#888888",
         ).pack(anchor="w", padx=10, pady=(0, 10))
 
         # Word list
-        list_frame = ctk.CTkFrame(tab, fg_color=BUTTON_COLOR, corner_radius=8)
-        list_frame.pack(fill="both", expand=True, padx=10, pady=5)
+        list_frame = ctk.CTkFrame(container, fg_color=BUTTON_COLOR, corner_radius=8, height=120)
+        list_frame.pack(fill="x", padx=10, pady=5)
+        list_frame.pack_propagate(False)
 
         self.word_listbox = tk.Listbox(
             list_frame,
@@ -524,7 +585,7 @@ class MoneyPennyGUI:
         self._refresh_word_list()
 
         # Add word entry
-        add_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        add_frame = ctk.CTkFrame(container, fg_color="transparent")
         add_frame.pack(fill="x", padx=10, pady=10)
 
         self.word_entry = ctk.CTkEntry(
@@ -551,7 +612,7 @@ class MoneyPennyGUI:
 
         # Remove button
         remove_btn = ctk.CTkButton(
-            tab,
+            container,
             text="Remove Selected Word",
             command=self._remove_word,
             fg_color="#D9534F",
@@ -560,6 +621,97 @@ class MoneyPennyGUI:
             width=150,
         )
         remove_btn.pack(pady=(0, 10))
+
+        ctk.CTkLabel(
+            container,
+            text="Verbal Commands",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color=TEXT_COLOR,
+        ).pack(anchor="w", padx=10, pady=(10, 0))
+
+        ctk.CTkLabel(
+            container,
+            text="AI cleanup interprets these from context; say the term normally when discussing it.",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color="#888888",
+            wraplength=500,
+            justify="left",
+        ).pack(anchor="w", padx=10, pady=(0, 5))
+
+        commands_text = (
+            "quote ... quote / open quote ... close quote    Wrap words in quotation marks\n"
+            "comma / period / question mark                  ,  .  ?\n"
+            "exclamation point / colon / semicolon           !  :  ;\n"
+            "new line / new paragraph                        Start a new line or paragraph\n"
+            "open parenthesis / close parenthesis            (  )\n"
+            "slash / backslash                               /  \\\n"
+            "the word comma / a comma                        Keep punctuation terms as words"
+        )
+        commands_box = ctk.CTkTextbox(
+            container,
+            height=175,
+            fg_color=BUTTON_COLOR,
+            text_color=TEXT_COLOR,
+            font=ctk.CTkFont(family="Consolas", size=11),
+            wrap="word",
+        )
+        commands_box.pack(fill="x", padx=10, pady=(0, 10))
+        commands_box.insert("1.0", commands_text)
+        commands_box.configure(state="disabled")
+
+    def _create_history_tab(self):
+        """Create the persistent captured-transcript history tab."""
+        tab = self.tabview.add("History")
+        tab.configure(fg_color=BG_COLOR)
+
+        ctk.CTkLabel(
+            tab,
+            text="Captured Transcripts",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color=TEXT_COLOR,
+        ).pack(anchor="w", padx=10, pady=(10, 0))
+
+        ctk.CTkLabel(
+            tab,
+            text="Stored locally. Shows the raw speech recognition and final cleaned text.",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color="#888888",
+        ).pack(anchor="w", padx=10, pady=(0, 8))
+
+        self.history_text = ctk.CTkTextbox(
+            tab,
+            fg_color=BUTTON_COLOR,
+            text_color=TEXT_COLOR,
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            wrap="word",
+        )
+        self.history_text.pack(fill="both", expand=True, padx=10, pady=5)
+        self.history_text.configure(state="disabled")
+
+        button_frame = ctk.CTkFrame(tab, fg_color="transparent")
+        button_frame.pack(fill="x", padx=10, pady=8)
+
+        ctk.CTkButton(
+            button_frame,
+            text="Copy Latest",
+            command=self._copy_latest_transcript,
+            fg_color=ACCENT_COLOR,
+            hover_color="#3A7BC8",
+            text_color="white",
+            width=110,
+        ).pack(side="left")
+
+        ctk.CTkButton(
+            button_frame,
+            text="Clear History",
+            command=self._clear_history,
+            fg_color="#D9534F",
+            hover_color="#C9302C",
+            text_color="white",
+            width=110,
+        ).pack(side="right")
+
+        self._refresh_history_display()
 
     def _create_status_tab(self):
         """Create the Status tab."""
@@ -633,6 +785,62 @@ class MoneyPennyGUI:
         else:
             messagebox.showinfo("MoneyPenny", "Please select a word to remove")
 
+    def _on_history_update(self):
+        """Schedule a history refresh from the transcription worker thread."""
+        if self.window and self.history_text:
+            try:
+                self.window.after(0, self._refresh_history_display)
+            except Exception:
+                pass
+
+    def _refresh_history_display(self):
+        """Render newest captured transcripts first."""
+        if not self.history_text:
+            return
+        entries = self.app.history.get_entries()
+        blocks = []
+        for entry in reversed(entries):
+            timestamp = entry.get("timestamp", "").replace("T", " ")
+            timestamp = timestamp[:19]
+            provider = entry.get("provider", "local").capitalize()
+            elapsed = entry.get("elapsed_seconds", 0)
+            cleaned = "AI cleaned" if entry.get("cleanup_used") else "no cleanup"
+            block = [f"{timestamp}  |  {provider}  |  {elapsed:.2f}s  |  {cleaned}"]
+            raw = entry.get("raw", "")
+            final = entry.get("final", "")
+            block.append(f"Final: {final}")
+            if raw != final:
+                block.append(f"Raw:   {raw}")
+            blocks.append("\n".join(block))
+
+        display = "\n\n".join(blocks) if blocks else "No captured transcripts yet."
+        try:
+            self.history_text.configure(state="normal")
+            self.history_text.delete("1.0", "end")
+            self.history_text.insert("1.0", display)
+            self.history_text.configure(state="disabled")
+        except Exception:
+            pass
+
+    def _copy_latest_transcript(self):
+        entries = self.app.history.get_entries()
+        if not entries:
+            messagebox.showinfo("MoneyPenny", "No captured transcripts yet")
+            return
+        self.window.clipboard_clear()
+        self.window.clipboard_append(entries[-1].get("final", ""))
+        self._log_activity("Copied latest transcript")
+
+    def _clear_history(self):
+        if not messagebox.askyesno(
+            "MoneyPenny",
+            "Clear all captured transcript history? This cannot be undone.",
+        ):
+            return
+        self.app.history.clear()
+        self._refresh_history_display()
+        self._log_activity("Cleared transcript history")
+
     def _save_settings(self):
         """Save settings and apply changes."""
         # Transcription mode (Local / Cloud)
@@ -646,6 +854,19 @@ class MoneyPennyGUI:
         self.app.settings.set("cloud_model", self.cloud_model_var.get())
         self.app.settings.set("groq_api_key", self.groq_apikey_var.get().strip())
         self.app.settings.set("groq_model", self.groq_model_var.get().strip() or "whisper-large-v3-turbo")
+        cleanup_modes = {
+            "Off": "off",
+            "Commands only": "commands",
+            "Always": "always",
+        }
+        self.app.settings.set(
+            "cleanup_mode",
+            cleanup_modes.get(self.cleanup_mode_var.get(), "commands"),
+        )
+        self.app.settings.set(
+            "cleanup_model",
+            self.cleanup_model_var.get().strip() or "llama-3.1-8b-instant",
+        )
 
         # Local model
         new_model = self.model_var.get()
@@ -709,6 +930,7 @@ class MoneyPennyGUI:
             "loading": "⏳ Loading speech model...",
             "recording": "🎙️ Recording...",
             "transcribing": "⏳ Transcribing...",
+            "cleaning": "Cleaning up...",
             "typing": "✓ Done",
             "error": "⚠️ Error",
             "shutdown": "Shutting down...",

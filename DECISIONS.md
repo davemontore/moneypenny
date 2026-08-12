@@ -4,6 +4,32 @@ Significant project decisions, with date, reason, and practical consequence.
 
 ---
 
+## 2026-08-12 — Context-aware cleanup replaces punctuation heuristics
+
+**Decision:** Raw speech recognition is followed by a selective Groq `llama-3.1-8b-instant` cleanup pass. Commands-only mode is the default: ordinary dictation returns immediately, while transcripts containing likely verbal punctuation receive contextual cleanup. Off and Always modes remain available. The cleaner returns the raw transcript unchanged when its call fails.
+
+**Reason:** Deterministic word replacement cannot reliably distinguish a punctuation command from literal prose such as "the word comma." Whisper's transcription prompt guides spelling and style but does not execute instructions. A fast language-model pass is the established solution used by modern Wispr Flow alternatives.
+
+**Alternatives considered:** Continue expanding regular-expression heuristics (inherently ambiguous and produced punctuation collisions); rely on Whisper punctuation alone (does not consistently handle spoken quotation commands); use a local cleanup model (slower and more setup on this computer).
+
+**Practical consequence:** Ordinary cloud dictation makes no additional request. Likely verbal commands make one additional small Groq request; if it fails, MoneyPenny types the raw transcript instead. Raw and final text are retained locally in the History tab for testing and troubleshooting.
+
+Sources: https://github.com/zachlatta/freeflow and https://github.com/jgvilchezc/flow
+
+---
+
+## 2026-08-12 — Ship a branded Windows executable for taskbar identity
+
+**Decision:** Build a windowed on-folder `MoneyPenny.exe` with the project icon embedded and target that executable from the Start Menu and pinned taskbar shortcuts. The executable receives the same `MoneyPenny.VoiceTyping` AppUserModelID as its shortcuts and receives the project folder through `--app-dir`, preserving existing settings, lexicon, history, and logs.
+
+**Reason:** On this Windows 11 build, a Python-hosted Tk window continued to display and group under Python even when its window icon, shortcut icon, and shortcut AppUserModelID were correct. A real executable gives Windows an application-owned icon and process identity.
+
+**Practical consequence:** `Install MoneyPenny.bat` and `Fix MoneyPenny Taskbar Icon.bat` produce the branded executable through the pinned PyInstaller build configuration. Runtime remains an on-folder build, avoiding one-file extraction overhead.
+
+Tagged versions are also built on GitHub's Windows runner and published as `MoneyPenny-Windows-x64.zip`. Ordinary users can therefore extract and run `MoneyPenny.exe` without installing Python; the source installer remains available to contributors.
+
+---
+
 ## 2026-08-09 — Installation is isolated and user data stays local
 
 **Decision:** MoneyPenny now installs tested component versions into a private `.venv` folder through `Install MoneyPenny.bat`. Both launchers use that environment. `settings.json` and `lexicon.txt` are local user data and are excluded from Git; a public `lexicon.example.txt` provides a safe starter.
