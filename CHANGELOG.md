@@ -1,5 +1,16 @@
 # Voice Typing App - Changelog
 
+## Version 3.1.1 - Correction Pipeline
+*In development*
+
+### Current Changes
+- Split the Dictionary into soft preferred-vocabulary hints and deterministic exact corrections
+- Added local heard-as → type-as rules with whole-phrase matching, longest-match priority, and exact output casing/symbols
+- Added narrow local repair for impossible punctuation collisions such as `:.` and `,?`
+- Added regression coverage and a durable multi-session upgrade plan
+
+---
+
 ## Version 3.1 - Context-Aware Cleanup and Transcript History
 *Released: August 2026*
 

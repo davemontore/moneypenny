@@ -5,7 +5,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from voice_to_text import TranscriptCleaner, TranscriptHistory, Transcriber
+from voice_to_text import (
+    ExactCorrections,
+    TranscriptCleaner,
+    TranscriptHistory,
+    Transcriber,
+    normalize_punctuation_collisions,
+)
 
 
 class FakeSettings:
@@ -14,6 +20,71 @@ class FakeSettings:
 
     def get(self, key, default=None):
         return self.values.get(key, default)
+
+
+class ExactCorrectionsTests(unittest.TestCase):
+    def test_rules_persist_and_preserve_exact_written_form(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "corrections.json"
+            corrections = ExactCorrections(path)
+            self.assertTrue(corrections.add("Whisper Flow", "Wispr Flow"))
+            self.assertTrue(corrections.add("C sharp", "C#"))
+
+            reloaded = ExactCorrections(path)
+            text, applied = reloaded.apply("whisper flow works with c SHARP.")
+
+            self.assertEqual(text, "Wispr Flow works with C#.")
+            self.assertEqual(len(applied), 2)
+
+    def test_rules_match_whole_phrases_only(self):
+        corrections = ExactCorrections(Path("missing-test-corrections.json"))
+        corrections.rules = [{"heard": "colon", "written": "Colin"}]
+        corrections._rebuild_matcher()
+
+        text, applied = corrections.apply("colonial colon colonoscopy")
+
+        self.assertEqual(text, "colonial Colin colonoscopy")
+        self.assertEqual(len(applied), 1)
+
+    def test_rules_use_longest_match_and_do_not_cascade(self):
+        corrections = ExactCorrections(Path("missing-test-corrections.json"))
+        corrections.rules = [
+            {"heard": "Whisper", "written": "Wispr"},
+            {"heard": "Whisper Flow", "written": "Wispr Flow"},
+            {"heard": "Wispr Flow", "written": "changed twice"},
+        ]
+        corrections._rebuild_matcher()
+
+        text, applied = corrections.apply("Whisper Flow")
+
+        self.assertEqual(text, "Wispr Flow")
+        self.assertEqual(len(applied), 1)
+
+    def test_duplicate_heard_phrase_is_case_insensitive(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            corrections = ExactCorrections(Path(temp_dir) / "corrections.json")
+            self.assertTrue(corrections.add("C sharp", "C#"))
+            self.assertFalse(corrections.add("c SHARP", "C Sharp"))
+
+
+class PunctuationNormalizationTests(unittest.TestCase):
+    def test_colon_supersedes_automatic_period(self):
+        self.assertEqual(
+            normalize_punctuation_collisions("He sent me this:."),
+            "He sent me this:",
+        )
+
+    def test_terminal_mark_supersedes_adjacent_comma(self):
+        self.assertEqual(
+            normalize_punctuation_collisions("Is this right,?"),
+            "Is this right?",
+        )
+
+    def test_intentional_ellipsis_is_preserved(self):
+        self.assertEqual(
+            normalize_punctuation_collisions("Wait... the word colon."),
+            "Wait... the word colon.",
+        )
 
 
 class TranscriptCleanerTests(unittest.TestCase):

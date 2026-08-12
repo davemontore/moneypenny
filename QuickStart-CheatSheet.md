@@ -43,8 +43,9 @@
 
 - `settings.json` stores your choices and API keys.
 - `lexicon.txt` stores your custom vocabulary.
+- `corrections.json` stores guaranteed heard-as → type-as replacements.
 - `transcript_history.jsonl` stores raw and cleaned captured transcripts for the History tab.
-- All three files remain on your computer and are excluded from GitHub.
+- All four files remain on your computer and are excluded from GitHub.
 
 ## Quick troubleshooting
 

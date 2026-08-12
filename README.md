@@ -9,7 +9,7 @@
 - **Cloud or local transcription**: Cloud mode (Groq or OpenRouter) is fast and accurate; Local mode (faster-whisper) works offline. Choose in the Settings tab.
 - **Selective context-aware cleanup**: Normal dictation stays on the fast single-request path; a Groq language-model pass runs only when verbal punctuation is detected and preserves literal phrases such as "the word comma"
 - **Settings window + system tray**: A GUI with Settings, Dictionary, History, and Status tabs. Closing the window hides it to the tray so it keeps listening.
-- **Custom dictionary**: Add names, jargon, and uncommon words (Dictionary tab or `lexicon.txt`) to improve recognition
+- **Preferred vocabulary and exact corrections**: Bias uncommon terminology, or guarantee local replacements such as `Whisper Flow` → `Wispr Flow` and `C sharp` → `C#`
 - **Captured transcript history**: Review raw and cleaned transcripts locally in the History tab
 - **Spoken punctuation**: Say commands such as `comma`, `question mark`, `new line`, or `quote ... quote`; see the reference in the Dictionary tab
 - **Quick exit**: Press Ctrl+Alt+Q, or right-click the tray icon → Exit
@@ -78,6 +78,8 @@ Acme Corporation
 Project Skylark
 ```
 
+Preferred vocabulary is a soft hint to the transcription model. For guaranteed spelling, add an **Exact Correction** in the same tab: enter what transcription usually produces under **Heard as**, and the required output under **Type as**. Exact corrections run locally and are stored privately in `corrections.json`.
+
 Captured transcripts are stored locally in `transcript_history.jsonl`, shown in the **History** tab, and excluded from Git.
 
 ## 📁 Project Structure
@@ -94,6 +96,7 @@ MoneyPenny/
 ├── MoneyPenny Voice Typing.bat # Windows launcher (recommended)
 ├── MoneyPenny Headless.bat     # Launcher without settings window/tray
 ├── lexicon.example.txt         # Safe starter for the private dictionary
+├── corrections.example.json   # Example deterministic spelling corrections
 ├── CHANGELOG.md                # Version history
 ├── QuickStart-CheatSheet.md    # One-page usage reference
 ├── ROADMAP.md                  # Product and installation direction
@@ -181,7 +184,8 @@ These steps avoid any coding or commands. You’ll click and open files like any
    - The launcher opens MoneyPenny without a black console window after setup is complete
 
 7) Add uncommon words (optional)
-   - Open the app's Dictionary tab, type a word, click Add
+   - Open the app's Dictionary tab and add a preferred word as a soft recognition hint
+   - For guaranteed spelling, add an Exact Correction with **Heard as** and **Type as**
    - (Or edit `lexicon.txt` in the “MoneyPenny” folder — one word or phrase per line — then restart the app)
 
 ### Copy‑and‑paste prompts for an AI helper (optional)

@@ -88,7 +88,7 @@ class MoneyPennyGUI:
 
         version_label = ctk.CTkLabel(
             header_frame,
-            text="v3.1",
+            text=f"v{getattr(self.app, 'version', '3.1.1')}",
             font=ctk.CTkFont(family="Segoe UI", size=12),
             text_color="#888888",
         )
@@ -553,14 +553,14 @@ class MoneyPennyGUI:
 
         ctk.CTkLabel(
             container,
-            text="Custom Words & Phrases",
+            text="Preferred Vocabulary",
             font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
             text_color=TEXT_COLOR,
         ).pack(anchor="w", padx=10, pady=(10, 0))
 
         ctk.CTkLabel(
             container,
-            text="These words are used to improve transcription accuracy",
+            text="Soft hints that make uncommon names and terminology more likely",
             font=ctk.CTkFont(family="Segoe UI", size=11),
             text_color="#888888",
         ).pack(anchor="w", padx=10, pady=(0, 10))
@@ -621,6 +621,87 @@ class MoneyPennyGUI:
             width=150,
         )
         remove_btn.pack(pady=(0, 10))
+
+        ctk.CTkLabel(
+            container,
+            text="Exact Corrections",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color=TEXT_COLOR,
+        ).pack(anchor="w", padx=10, pady=(10, 0))
+
+        ctk.CTkLabel(
+            container,
+            text="Guaranteed local replacements, such as Whisper Flow → Wispr Flow or C sharp → C#",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color="#888888",
+            wraplength=500,
+            justify="left",
+        ).pack(anchor="w", padx=10, pady=(0, 10))
+
+        correction_list_frame = ctk.CTkFrame(
+            container, fg_color=BUTTON_COLOR, corner_radius=8, height=130
+        )
+        correction_list_frame.pack(fill="x", padx=10, pady=5)
+        correction_list_frame.pack_propagate(False)
+
+        self.correction_listbox = tk.Listbox(
+            correction_list_frame,
+            bg=BG_COLOR,
+            fg=TEXT_COLOR,
+            font=("Segoe UI", 12),
+            selectbackground=ACCENT_COLOR,
+            selectforeground="white",
+            activestyle="none",
+            highlightthickness=0,
+            bd=0,
+        )
+        self.correction_listbox.pack(fill="both", expand=True, padx=5, pady=5)
+        self._refresh_correction_list()
+
+        correction_entry_frame = ctk.CTkFrame(container, fg_color="transparent")
+        correction_entry_frame.pack(fill="x", padx=10, pady=10)
+
+        self.heard_entry = ctk.CTkEntry(
+            correction_entry_frame,
+            placeholder_text="Heard as...",
+            fg_color=BG_COLOR,
+            border_color=BUTTON_COLOR,
+            text_color=TEXT_COLOR,
+        )
+        self.heard_entry.pack(side="left", fill="x", expand=True)
+
+        self.written_entry = ctk.CTkEntry(
+            correction_entry_frame,
+            placeholder_text="Type as...",
+            fg_color=BG_COLOR,
+            border_color=BUTTON_COLOR,
+            text_color=TEXT_COLOR,
+        )
+        self.written_entry.pack(side="left", fill="x", expand=True, padx=(8, 0))
+        self.heard_entry.bind("<Return>", lambda e: self.written_entry.focus_set())
+        self.written_entry.bind("<Return>", lambda e: self._add_correction())
+
+        correction_add_btn = ctk.CTkButton(
+            correction_entry_frame,
+            text="Add",
+            command=self._add_correction,
+            fg_color=ACCENT_COLOR,
+            hover_color="#3A7BC8",
+            text_color="white",
+            width=70,
+        )
+        correction_add_btn.pack(side="left", padx=(8, 0))
+
+        correction_remove_btn = ctk.CTkButton(
+            container,
+            text="Remove Selected Correction",
+            command=self._remove_correction,
+            fg_color="#D9534F",
+            hover_color="#C9302C",
+            text_color="white",
+            width=190,
+        )
+        correction_remove_btn.pack(pady=(0, 10))
 
         ctk.CTkLabel(
             container,
@@ -784,6 +865,45 @@ class MoneyPennyGUI:
                 self._log_activity(f"Removed word: {word}")
         else:
             messagebox.showinfo("MoneyPenny", "Please select a word to remove")
+
+    def _refresh_correction_list(self):
+        """Refresh deterministic heard-as -> type-as rules."""
+        self.correction_listbox.delete(0, "end")
+        self.correction_display_rules = list(self.app.corrections.rules)
+        for rule in self.correction_display_rules:
+            self.correction_listbox.insert(
+                "end", f'{rule["heard"]}  →  {rule["written"]}'
+            )
+
+    def _add_correction(self):
+        """Add an exact local correction rule."""
+        heard = self.heard_entry.get().strip()
+        written = self.written_entry.get().strip()
+        if not heard or not written:
+            messagebox.showinfo(
+                "MoneyPenny", "Enter both the phrase MoneyPenny heard and what it should type."
+            )
+            return
+        if self.app.corrections.add(heard, written):
+            self.heard_entry.delete(0, "end")
+            self.written_entry.delete(0, "end")
+            self._refresh_correction_list()
+            self._log_activity(f"Added exact correction: {heard} → {written}")
+        else:
+            messagebox.showinfo(
+                "MoneyPenny", "A correction for that heard phrase already exists."
+            )
+
+    def _remove_correction(self):
+        """Remove the selected exact correction rule."""
+        selection = self.correction_listbox.curselection()
+        if not selection:
+            messagebox.showinfo("MoneyPenny", "Please select a correction to remove")
+            return
+        rule = self.correction_display_rules[selection[0]]
+        if self.app.corrections.remove(rule["heard"]):
+            self._refresh_correction_list()
+            self._log_activity(f'Removed exact correction: {rule["heard"]}')
 
     def _on_history_update(self):
         """Schedule a history refresh from the transcription worker thread."""

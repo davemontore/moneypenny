@@ -1,4 +1,4 @@
-"""MoneyPenny v3.1 — cloud or local voice typing for Windows."""
+"""MoneyPenny v3.1.1 — cloud or local voice typing for Windows."""
 
 import pyaudio
 import keyboard
@@ -19,6 +19,7 @@ import signal
 import atexit
 import json
 import socket
+import re
 from datetime import datetime
 
 
@@ -58,6 +59,7 @@ LOG_DIR = APP_DIR / "logs"
 LOG_FILE = LOG_DIR / "moneypenny.log"
 SETTINGS_FILE = APP_DIR / "settings.json"
 LEXICON_FILE = APP_DIR / "lexicon.txt"
+CORRECTIONS_FILE = APP_DIR / "corrections.json"
 HISTORY_FILE = APP_DIR / "transcript_history.jsonl"
 
 
@@ -158,6 +160,7 @@ def _notify_already_running():
 
 
 # --- Configuration ---
+APP_VERSION = "3.1.1"
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000
@@ -279,6 +282,131 @@ class Lexicon:
             + "."
         )
         return prompt[:600]
+
+
+class ExactCorrections:
+    """Persistent, deterministic heard-as -> type-as correction rules."""
+
+    def __init__(self, path: Path = CORRECTIONS_FILE):
+        self.path = path
+        self.rules = []
+        self._pattern = None
+        self._by_heard = {}
+        self.load()
+
+    def load(self):
+        self.rules = []
+        if not self.path.exists():
+            return
+        try:
+            with open(self.path, "r", encoding="utf-8") as corrections_file:
+                saved = json.load(corrections_file)
+
+            # Accept both the documented list format and a simple object map so
+            # hand-edited files are forgiving.
+            if isinstance(saved, dict):
+                saved = [
+                    {"heard": heard, "written": written}
+                    for heard, written in saved.items()
+                ]
+
+            for rule in saved if isinstance(saved, list) else []:
+                if not isinstance(rule, dict):
+                    continue
+                heard = str(rule.get("heard", "")).strip()
+                written = str(rule.get("written", "")).strip()
+                if heard and written and not self._contains_heard(heard):
+                    self.rules.append({"heard": heard, "written": written})
+            self._rebuild_matcher()
+            logger.info("Exact corrections loaded: %d rules", len(self.rules))
+        except Exception:
+            logger.exception("Failed to load exact corrections")
+
+    def save(self):
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            temporary_path = self.path.with_suffix(self.path.suffix + ".tmp")
+            with open(temporary_path, "w", encoding="utf-8") as corrections_file:
+                json.dump(self.rules, corrections_file, indent=2, ensure_ascii=False)
+                corrections_file.write("\n")
+            temporary_path.replace(self.path)
+            logger.info("Exact corrections saved: %d rules", len(self.rules))
+        except Exception:
+            logger.exception("Failed to save exact corrections")
+
+    def _contains_heard(self, heard: str) -> bool:
+        target = heard.casefold()
+        return any(rule["heard"].casefold() == target for rule in self.rules)
+
+    def _rebuild_matcher(self):
+        """Compile rules once so applying them adds minimal dictation latency."""
+        self._by_heard = {
+            rule["heard"].casefold(): rule
+            for rule in self.rules
+        }
+        alternatives = sorted(
+            (re.escape(rule["heard"]) for rule in self.rules),
+            key=len,
+            reverse=True,
+        )
+        self._pattern = (
+            re.compile(
+                r"(?<!\w)(?:" + "|".join(alternatives) + r")(?!\w)",
+                re.IGNORECASE,
+            )
+            if alternatives
+            else None
+        )
+
+    def add(self, heard: str, written: str) -> bool:
+        heard = heard.strip()
+        written = written.strip()
+        if not heard or not written or self._contains_heard(heard):
+            return False
+        self.rules.append({"heard": heard, "written": written})
+        self._rebuild_matcher()
+        self.save()
+        return True
+
+    def remove(self, heard: str) -> bool:
+        target = heard.casefold()
+        for index, rule in enumerate(self.rules):
+            if rule["heard"].casefold() == target:
+                del self.rules[index]
+                self._rebuild_matcher()
+                self.save()
+                return True
+        return False
+
+    def apply(self, text: str) -> tuple[str, list]:
+        """Apply all matching rules once, longest first, without cascades."""
+        if not text or self._pattern is None:
+            return text, []
+        applied = []
+
+        def replace_match(match):
+            rule = self._by_heard[match.group(0).casefold()]
+            applied.append({
+                "heard": match.group(0),
+                "written": rule["written"],
+            })
+            return rule["written"]
+
+        return self._pattern.sub(replace_match, text), applied
+
+
+def normalize_punctuation_collisions(text: str) -> str:
+    """Resolve impossible punctuation collisions without rewriting language."""
+    if not text:
+        return text
+
+    # A colon or semicolon spoken at the end of a sentence supersedes the
+    # automatic punctuation supplied by the speech model (":." -> ":").
+    text = re.sub(r"([:;])[.,](?=\s|$|[\"”’\)\]])", r"\1", text)
+    # Terminal punctuation supersedes a comma inserted beside it (",." -> ".").
+    text = re.sub(r",([!?])", r"\1", text)
+    text = re.sub(r",\.(?!\.)", ".", text)
+    return text
 
 
 class TranscriptHistory:
@@ -674,8 +802,10 @@ class MoneyPennyApp:
     """Main application class."""
 
     def __init__(self):
+        self.version = APP_VERSION
         self.settings = Settings()
         self.lexicon = Lexicon()
+        self.corrections = ExactCorrections()
         self.transcriber = Transcriber(self.settings, self.lexicon)
         self.cleaner = TranscriptCleaner(self.settings)
         self.history = TranscriptHistory()
@@ -790,12 +920,16 @@ class MoneyPennyApp:
 
         if text:
             logger.info("Raw transcript (%.2fs): %s", elapsed, text)
+            text, applied_corrections = self.corrections.apply(text)
+            if applied_corrections:
+                logger.info("Applied exact corrections: %s", applied_corrections)
             if self.cleaner.should_clean(text):
                 self._notify_status("cleaning", "Applying context-aware cleanup...")
             text, cleanup_used = self.cleaner.clean(text)
             if self.cleaner.last_error:
                 logger.info(self.cleaner.last_error)
             text = self._strip_stock_phrases(text)
+            text = normalize_punctuation_collisions(text)
         if text:
             total_elapsed = time.time() - start_time
             logger.info("Final transcript (%.2fs): %s", total_elapsed, text)
