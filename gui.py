@@ -639,10 +639,10 @@ class MoneyPennyGUI:
         ).pack(anchor="w", padx=10, pady=(0, 5))
 
         commands_text = (
-            "quote ... quote / open quote ... close quote    Wrap words in quotation marks\n"
+            "quote ... quote / open quote ... close or end quote    Wrap words in quotation marks\n"
             "comma / period / question mark                  ,  .  ?\n"
             "exclamation point / colon / semicolon           !  :  ;\n"
-            "new line / new paragraph                        Start a new line or paragraph\n"
+            "new line / new paragraph                        Line break (Shift+Enter; never sends; twice = blank line)\n"
             "open parenthesis / close parenthesis            (  )\n"
             "slash / backslash                               /  \\\n"
             "the word comma / a comma                        Keep punctuation terms as words"

@@ -11,7 +11,7 @@
 - **Settings window + system tray**: A GUI with Settings, Dictionary, History, and Status tabs. Closing the window hides it to the tray so it keeps listening.
 - **Custom dictionary**: Add names, jargon, and uncommon words (Dictionary tab or `lexicon.txt`) to improve recognition
 - **Captured transcript history**: Review raw and cleaned transcripts locally in the History tab
-- **Spoken punctuation**: Say commands such as `comma`, `question mark`, `new line`, or `quote ... quote`; see the reference in the Dictionary tab
+- **Spoken punctuation**: Say commands such as `comma`, `question mark`, `new line` (line break; works in every app, never sends — say twice for a blank line), or `quote ... quote` (closing may be `quote`, `close quote`, or `end quote`); see the reference in the Dictionary tab
 - **Quick exit**: Press Ctrl+Alt+Q, or right-click the tray icon → Exit
 
 ## 🚀 Quick Start
@@ -45,7 +45,8 @@ This route needs only Windows 10/11 and a microphone—Python is already include
    - Place the cursor in any text field
    - Hold RIGHT CTRL to dictate
    - Release to transcribe; text will be typed automatically
-   - For quoted text, say `quote this is quoted quote`; MoneyPenny types `"this is quoted"`
+   - For quoted text, say `quote this is quoted quote` (or `open quote this is quoted end quote`); MoneyPenny types `"this is quoted"`
+   - For a line break, say `new line` (or `new paragraph` — both are the same safe break that never sends a message); say it twice for a blank line
    - When discussing punctuation itself, use natural context such as `the word comma` or `a comma`
    - Note: closing the window does NOT quit the app — it hides to the tray. To quit: Ctrl+Alt+Q or right-click the tray icon → Exit
 
@@ -97,6 +98,9 @@ MoneyPenny/
 ├── CHANGELOG.md                # Version history
 ├── QuickStart-CheatSheet.md    # One-page usage reference
 ├── ROADMAP.md                  # Product and installation direction
+├── DECISIONS.md                # Significant decisions and their reasons
+├── LESSONS_LEARNED.md          # Reusable lessons, newest first
+├── SESSION_CLOSEOUT.md         # End-of-day closeout checklist
 └── README.md                   # This file
 ```
 

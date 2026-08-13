@@ -27,8 +27,8 @@
 ### Spoken punctuation
 
 - Say `quote hello quote` to type `"hello"`.
-- You can also say `open quote hello close quote`.
-- Other commands include `comma`, `period`, `question mark`, `exclamation point`, `colon`, `semicolon`, `new line`, `new paragraph`, `open parenthesis`, `close parenthesis`, `slash`, and `backslash`.
+- You can also say `open quote hello close quote` or `open quote hello end quote`.
+- Other commands include `comma`, `period`, `question mark`, `exclamation point`, `colon`, `semicolon`, `new line` / `new paragraph` (line break; works in every app, never sends — say twice for a blank line), `open parenthesis`, `close parenthesis`, `slash`, and `backslash`.
 - To discuss punctuation as words, use natural context such as `the word comma` or `a comma`.
 - The full command reference is on the Dictionary tab.
 
@@ -55,7 +55,7 @@
 
 ## Reference
 
-- **Version:** 3.1
+- **Version:** 3.1.1
 - **Default hotkey:** RIGHT CTRL (hold to record, release to transcribe)
 - **Quit:** Ctrl+Alt+Q or tray icon → Exit
 - **Normal release launcher:** `MoneyPenny.exe`

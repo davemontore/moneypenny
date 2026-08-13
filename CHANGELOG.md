@@ -1,5 +1,21 @@
 # Voice Typing App - Changelog
 
+## Version 3.1.1 - Dictation Reliability Fixes
+*Released: August 2026*
+
+### 🔧 Technical Fixes
+- **Overlapping dictations no longer double-type**: transcribe-and-type runs are serialized, so a slow or stalled cloud request can no longer cause a later transcript to be pasted twice or out of order
+- **Cloud transcription retries once** on provider 5xx errors (e.g. Groq HTTP 522) and dropped connections before reporting failure
+- **Microphone stays warm with a half-second pre-roll**, so very quick hotkey presses capture audio instead of producing "No audio recorded"
+- **Cleanup understands line-break commands and quote punctuation**: `new line` / `new paragraph` now emit real line breaks, and commas/periods are placed inside closing quotation marks
+- **One universal line break — no app-specific behavior to remember**: `new line` and `new paragraph` both type Shift+Enter, which works in every app and never sends a chat message; say it twice for a blank line
+- **Quote commands accept synonyms**: `end quote` now works anywhere `close quote` does
+
+### 🧪 Development Notes
+- Added regression tests for the cleanup prompt's line-break and quote-punctuation guidance and for the cloud retry behavior
+
+---
+
 ## Version 3.1 - Context-Aware Cleanup and Transcript History
 *Released: August 2026*
 

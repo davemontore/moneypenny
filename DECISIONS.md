@@ -4,6 +4,16 @@ Significant project decisions, with date, reason, and practical consequence.
 
 ---
 
+## 2026-08-13 — One universal line break; quote synonyms; never type bare Enter
+
+**Decision:** `new line`, `newline`, and `new paragraph` all do exactly the same thing: a soft line break typed as Shift+Enter. MoneyPenny never types a bare Enter. `end quote` is a full synonym of `close quote` in every quote pairing. Break tokens are extracted at the transcript edges in code, the language model only decides mid-sentence cases, and all model output is normalized deterministically (newline runs collapsed to one break, spaces tightened inside quotes).
+
+**Reason:** A build that typed Enter twice for "new paragraph" sent the user's chat message mid-dictation, and requiring different commands per app ("new line in chat, new paragraph in documents") transfers complexity to the user every single time they dictate. The small cleanup model (llama-3.1-8b-instant) also proved inconsistent about emitting one newline versus two, so exact formatting cannot be delegated to it.
+
+**Practical consequence:** A blank line is always "say the line-break command twice." Documents receive soft breaks rather than true paragraph marks — an acceptable trade for a command that can never accidentally send a message anywhere. "new paragraph" is kept as an alias so old muscle memory still works.
+
+---
+
 ## 2026-08-12 — Context-aware cleanup replaces punctuation heuristics
 
 **Decision:** Raw speech recognition is followed by a selective Groq `llama-3.1-8b-instant` cleanup pass. Commands-only mode is the default: ordinary dictation returns immediately, while transcripts containing likely verbal punctuation receive contextual cleanup. Off and Always modes remain available. The cleaner returns the raw transcript unchanged when its call fails.
