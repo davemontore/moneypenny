@@ -1,6 +1,6 @@
 # Voice Typing App - Changelog
 
-## Version 3.1.1 - Correction Pipeline
+## Version 3.1.2 - Correction Pipeline
 *Released: August 25, 2026*
 
 ### Current Changes
@@ -13,12 +13,20 @@
 - Split the Dictionary into soft preferred-vocabulary hints and deterministic exact corrections
 - Added local heard-as → type-as rules with whole-phrase matching, longest-match priority, and exact output casing/symbols
 - Added narrow local repair for impossible punctuation collisions such as `:.` and `,?`
+- Added regression coverage and a durable multi-session upgrade plan
+
+---
+
+## Version 3.1.1 - Dictation Reliability Fixes
+*Released: August 13, 2026*
+
+### Technical Fixes
 - Serialized complete dictations so stalled cloud requests cannot double-type or reorder later transcripts
 - Cloud transcription retries transient 5xx responses and dropped connections once before reporting failure
 - Kept the microphone warm with a short pre-roll so quick hotkey presses retain their opening audio
 - Made `new line`, `newline`, and `new paragraph` the same safe Shift+Enter break; say one twice for a blank line
 - Normalized commas and periods inside closing quotation marks without relying on the cleanup model
-- Added regression coverage and a durable multi-session upgrade plan
+- Added regression tests for line-break commands, quote punctuation, and cloud retry behavior
 
 ---
 

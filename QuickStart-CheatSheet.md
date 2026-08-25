@@ -63,7 +63,7 @@ MoneyPenny saves nothing if you decline. Turn this trial feature off with **Sugg
 
 ## Reference
 
-- **Version:** 3.1.1
+- **Version:** 3.1.2
 - **Default hotkey:** RIGHT CTRL (hold to record, release to transcribe)
 - **Quit:** Ctrl+Alt+Q or tray icon → Exit
 - **Normal release launcher:** `MoneyPenny.exe`
