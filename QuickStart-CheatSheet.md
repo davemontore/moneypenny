@@ -27,7 +27,7 @@
 ### Spoken punctuation
 
 - Quotes: say `quote ... end quote`, `quote ... quote`, or `open quote ... close quote`.
-- Other commands include `comma`, `period`, `question mark`, `exclamation point`, `colon`, `semicolon`, `new line`, `new paragraph`, `open parenthesis`, `close parenthesis`, `slash`, and `backslash`.
+- Other commands include `comma`, `period`, `question mark`, `exclamation point`, `colon`, `semicolon`, `new line` / `new paragraph` (the same safe Shift+Enter break; say either twice for a blank line), `open parenthesis`, `close parenthesis`, `slash`, and `backslash`.
 - To discuss punctuation as words, use natural context such as `the word comma` or `a comma`.
 - The full command reference is on the Dictionary tab.
 
@@ -63,7 +63,7 @@ MoneyPenny saves nothing if you decline. Turn this trial feature off with **Sugg
 
 ## Reference
 
-- **Version:** 3.1
+- **Version:** 3.1.1
 - **Default hotkey:** RIGHT CTRL (hold to record, release to transcribe)
 - **Quit:** Ctrl+Alt+Q or tray icon → Exit
 - **Normal release launcher:** `MoneyPenny.exe`

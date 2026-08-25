@@ -28,6 +28,24 @@ https://console.groq.com/docs/models
 
 ---
 
+## 2026-08-13 — One universal line break; never type bare Enter
+
+**Decision:** `new line`, `newline`, and `new paragraph` all produce the same
+soft line break typed as Shift+Enter. MoneyPenny never types a bare Enter. Say
+any line-break command twice for a blank line.
+
+**Reason:** Bare Enter can submit chat-style text boxes, and per-application
+behavior would force the user to classify every focused editor before speaking.
+Fast cleanup models are also inconsistent about emitting one newline versus
+two, so code must enforce the exact mechanics.
+
+**Practical consequence:** Documents receive soft breaks rather than true
+paragraph marks—an acceptable trade for one composable command that cannot
+accidentally send a message. Local parsing handles routine commands; contextual
+cleanup only resolves remaining ambiguity.
+
+---
+
 ## 2026-08-12 — Context-aware cleanup replaces punctuation heuristics
 
 **Decision:** Raw speech recognition is followed by a selective Groq `llama-3.1-8b-instant` cleanup pass. Commands-only mode is the default: ordinary dictation returns immediately, while transcripts containing likely verbal punctuation receive contextual cleanup. Off and Always modes remain available. The cleaner returns the raw transcript unchanged when its call fails.

@@ -1,0 +1,15 @@
+# MoneyPenny — workspace rules for Cline
+
+## Session closeout (important)
+
+When the user says **"let's close out the session for the day"** — or any similar phrase about closing out, wrapping up, or ending work for the day — follow `SESSION_CLOSEOUT.md` step by step before ending the session. Verify every step against the actual machine state; never mark a step done that was not actually checked.
+
+## Project facts
+
+- This is a Windows voice-typing app. Use the project's `.venv\Scripts\python.exe`, never system Python.
+- Tests use stdlib unittest: `.venv\Scripts\python.exe -m unittest discover -s tests`. pytest is not required and not installed.
+- Build the app with `"Build MoneyPenny.exe.bat" --no-pause`; run it with `dist\MoneyPenny\MoneyPenny.exe --app-dir "<project folder>"`.
+- Never commit `settings.json`, `lexicon.txt`, `corrections.json`,
+  `transcript_history.jsonl`, or any API key.
+- Docs are living documents: update `CHANGELOG.md`, `DECISIONS.md`, and `LESSONS_LEARNED.md` whenever behavior changes.
+- Evidence first: the app log at `logs\moneypenny.log` records every dictation (raw and final transcripts) — read it before diagnosing.

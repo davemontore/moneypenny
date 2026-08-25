@@ -4,6 +4,18 @@ Reusable lessons from building MoneyPenny. Newest first.
 
 ---
 
+## 2026-08-13 — Never make the user remember per-app behavior; never trust a small model's formatting
+
+Two related lessons from the line-break work. First, a command that behaves differently depending on which app has focus (Enter in documents, Shift+Enter in chat) forces the user to classify every text box before dictating — they will rightly reject it. Prefer one universal, always-safe behavior plus a compositional rule (say it twice for a blank line). Second, small fast models are inconsistent about exact output details such as one newline versus two; keep the model's job contextual (command versus prose) and enforce the mechanics deterministically around it: extract unambiguous edge commands in code, collapse newline runs, tighten quote spacing. Reusable rule: LLM decides *what*, code decides *exactly how*.
+
+---
+
+## 2026-08-13 — Slow cloud requests turn concurrent dictations into double typing
+
+When the Groq endpoint browned out (HTTP 522), every hotkey release spawned its own transcribe-and-type thread. Two stalled requests then completed back-to-back and both typed their text — the user saw the same sentence pasted twice, while presses during the brown-out looked like "not recording." Fix: serialize dictation end-to-end (one transcript transcribed, cleaned, and typed at a time) and retry transient 5xx/connection failures once. Log both the error and the retry so brown-outs stay visible after the fact. Related: an on-demand microphone stream starts too slowly for quick press-and-release captures; keeping the stream warm with a small pre-roll buffer makes short dictations reliable.
+
+---
+
 ## 2026-08-09 — Test a desktop app through its real entry point
 
 A visible GUI does not mean the GUI module is the program Windows launches. MoneyPenny's process starts from `voice_to_text.py`, which owns the application lifecycle and imports the window and tray components from `gui.py`. Therefore, Windows correctly identifies the running command as `voice_to_text.py` even while the settings window is visible.

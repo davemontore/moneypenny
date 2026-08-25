@@ -13,7 +13,7 @@
 - **Preferred vocabulary and exact corrections**: Bias uncommon terminology, or guarantee local replacements such as `Whisper Flow` → `Wispr Flow` and `C sharp` → `C#`
 - **Correction recognition**: Immediately Backspace and retype the end of a new transcript; MoneyPenny asks whether to learn the change as an exact correction
 - **Captured transcript history**: Review raw and cleaned transcripts locally in the History tab
-- **Spoken punctuation**: Say commands such as `comma`, `question mark`, `new line`, or `quote ... end quote`; see the reference in the Dictionary tab
+- **Spoken punctuation**: Say commands such as `comma`, `question mark`, `new line` (a safe Shift+Enter break; say it twice for a blank line), or `quote ... end quote`; see the reference in the Dictionary tab
 - **Quick exit**: Press Ctrl+Alt+Q, or right-click the tray icon → Exit
 
 ## 🚀 Quick Start
@@ -47,7 +47,8 @@ This route needs only Windows 10/11 and a microphone—Python is already include
    - Place the cursor in any text field
    - Hold RIGHT CTRL to dictate
    - Release to transcribe; text will be typed automatically
-   - For quoted text, say `quote this is quoted quote`; MoneyPenny types `"this is quoted"`
+   - For quoted text, say `quote this is quoted quote` or `open quote this is quoted end quote`; MoneyPenny types `"this is quoted"`
+   - For a line break, say `new line`, `newline`, or `new paragraph`; all use safe Shift+Enter and never submit a chat message. Say the command twice for a blank line.
    - When discussing punctuation itself, use natural context such as `the word comma` or `a comma`
    - Note: closing the window does NOT quit the app — it hides to the tray. To quit: Ctrl+Alt+Q or right-click the tray icon → Exit
 
@@ -105,6 +106,9 @@ MoneyPenny/
 ├── CHANGELOG.md                # Version history
 ├── QuickStart-CheatSheet.md    # One-page usage reference
 ├── ROADMAP.md                  # Product and installation direction
+├── DECISIONS.md                # Significant decisions and their reasons
+├── LESSONS_LEARNED.md          # Reusable engineering lessons
+├── SESSION_CLOSEOUT.md         # End-of-day release checklist
 └── README.md                   # This file
 ```
 

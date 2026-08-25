@@ -750,7 +750,7 @@ class MoneyPennyGUI:
             "quote ... end quote / open quote ... close quote  Wrap words in quotation marks\n"
             "comma / period / question mark                  ,  .  ?\n"
             "exclamation point / colon / semicolon           !  :  ;\n"
-            "new line / new paragraph                        Start a new line or paragraph\n"
+            "new line / new paragraph                        Soft break (Shift+Enter; twice = blank line)\n"
             "open parenthesis / close parenthesis            (  )\n"
             "slash / backslash                               /  \\\n"
             "the word comma / a comma                        Keep punctuation terms as words"
