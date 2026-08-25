@@ -90,7 +90,7 @@ class MoneyPennyGUI:
 
         version_label = ctk.CTkLabel(
             header_frame,
-            text=f"v{getattr(self.app, 'version', '3.1.1')}",
+            text=f"v{getattr(self.app, 'version', '3.1.2')}",
             font=ctk.CTkFont(family="Segoe UI", size=12),
             text_color="#888888",
         )

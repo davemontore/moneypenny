@@ -1,4 +1,4 @@
-"""MoneyPenny v3.1.1 — cloud or local voice typing for Windows."""
+"""MoneyPenny v3.1.2 — cloud or local voice typing for Windows."""
 
 import pyaudio
 import keyboard
@@ -258,7 +258,7 @@ def _focus_existing_window(timeout_seconds=1.5):
 
 
 # --- Configuration ---
-APP_VERSION = "3.1.1"
+APP_VERSION = "3.1.2"
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000

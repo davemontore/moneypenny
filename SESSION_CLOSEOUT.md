@@ -32,7 +32,7 @@ When the user says something like **"let's close out the session for the day"** 
 
 - [ ] Commit all changes with a clear message (never commit user data or API keys).
 - [ ] Push the branch to origin.
-- [ ] If `CHANGELOG.md` carries a new version header, tag it (`v3.1.1` style) and push the tag — this triggers the GitHub Actions release build that publishes `MoneyPenny-Windows-x64.zip`.
+- [ ] If `CHANGELOG.md` carries a new version header, tag it (`vX.Y.Z` style) and push the tag — this triggers the GitHub Actions release build that publishes `MoneyPenny-Windows-x64.zip`.
 - [ ] If the `gh` CLI is available, confirm the workflow run started (`gh run list --limit 1`).
 
 ## 6. Report
