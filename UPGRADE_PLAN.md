@@ -43,12 +43,17 @@ suite and live dictation checklist pass.
 
 ### Phase 2 — Local spoken-command parser
 
-- [ ] Define protected literal forms: `the word colon`, `say colon`, and equivalents.
-- [ ] Parse unambiguous single commands locally: comma, period, question mark,
+- [x] Define protected literal forms: `the word colon`, `say colon`, and equivalents.
+- [x] Parse unambiguous single commands locally: comma, period, question mark,
       exclamation point, colon, semicolon, new line, and new paragraph.
-- [ ] Parse paired commands locally: quotes and parentheses.
-- [ ] Normalize spacing around inserted punctuation.
-- [ ] Keep the current remote cleaner available behind an explicit fallback setting.
+- [x] Parse paired commands locally: quotes and parentheses.
+- [x] Normalize spacing around inserted punctuation.
+- [x] Keep the current remote cleaner available behind an explicit fallback setting.
+
+The correction-recognition proposal has been scoped separately in
+`CORRECTION_LEARNING_SCOPE.md`. A constrained, confirm-before-saving version is
+feasible; arbitrary edits across every Windows application are not reliably
+observable from global key events alone.
 
 ### Phase 3 — Ambiguity routing
 
@@ -97,6 +102,42 @@ Also verify that no final text contains punctuation collisions such as `:.`,
 
 ## Session log
 
+### 2026-08-25 — Local punctuation and quote repair
+
+- Fresh history reproduced `quote ... end quote` leaking into final text.
+- The log identified Groq HTTP 404 for the retired
+  `llama-3.1-8b-instant` cleanup model as the immediate cause.
+- Added and tested a local command parser, including the exact reported
+  sentence, protected literal forms, spacing, and adjacent punctuation.
+- Migrated old settings to Groq's recommended `openai/gpt-oss-20b` replacement;
+  a live cleanup request succeeded with the new model.
+- Scoped correction recognition as a constrained confirm-before-save feature
+  in `CORRECTION_LEARNING_SCOPE.md`.
+- Built candidate 3 and installed its executable in `dist/MoneyPenny`.
+- Candidate 3 started in Cloud mode, loaded the private vocabulary and five
+  exact corrections, and reported Ready.
+- Automated verification: 27 tests pass, syntax compilation passes, the frozen
+  build succeeds, and the installed executable hash matches candidate 3.
+
+### 2026-08-25 — Correction-recognition trial
+
+- Implemented the constrained 10-second Backspace-and-retype detector described
+  in `CORRECTION_LEARNING_SCOPE.md`.
+- Whole-word diff expansion prevents dangerous character-only rules such as
+  `A` → `a`; suggestions remain bounded to five words and 80 characters.
+- The detector cancels on ordinary typing, navigation, modifiers, focus/window
+  changes, mouse input, a second dictation, or timeout.
+- Detectable Win32 password controls are excluded; the feature remains
+  independently disabled from Settings for custom controls that do not expose
+  secure-field state.
+- Every candidate requires a GUI confirmation before `corrections.json` changes.
+- Automated verification increased to 36 passing tests, including confirmed
+  suggestion persistence through the existing exact-correction store.
+- Candidate 4 was built, hash-verified into `dist/MoneyPenny`, and started with
+  the correction monitor active in Cloud mode.
+- The user explicitly approved pushing, merging, and publishing the completed
+  update on 2026-08-25 after reviewing the live behavior.
+
 ### 2026-08-12 — Plan created
 
 - Release converted to draft; repository and tag preserved.
@@ -120,7 +161,7 @@ Repository state:
 - Phase 1 commit: `e95f378` (`Add deterministic correction pipeline`)
 - Public `v3.1.0` release remains a draft; do not republish it.
 - Private candidate executable:
-  `build/v3.1.1-candidate2/dist/MoneyPenny/MoneyPenny.exe`
+  `build/v3.1.1-candidate4/dist/MoneyPenny/MoneyPenny.exe`
 - The candidate is intentionally using the project folder for private settings,
   vocabulary, corrections, history, and logs.
 
@@ -132,18 +173,20 @@ Working behavior:
 - The live private correction file contains variants for Wispr Flow and C#.
 - `Colin` is present as preferred vocabulary, not as an unconditional correction,
   because globally replacing `colon` would break the punctuation command.
-- Narrow punctuation-collision repair is active after transcription cleanup.
-- Seventeen tests pass; a 1,000-rule correction benchmark averaged 0.003 ms.
+- Common punctuation commands and paired quotation forms now run locally before
+  optional cleanup; `quote ... end quote` is covered explicitly.
+- Saved `llama-3.1-8b-instant` cleanup settings migrate automatically to
+  `openai/gpt-oss-20b`.
+- Twenty-seven tests pass; a 1,000-rule correction benchmark averaged 0.003 ms.
 
 Next-session task order:
 
 1. Read this file and confirm the active branch before editing.
-2. Review fresh transcript history from normal use of candidate 2; preserve the
-   fast Phase 1 behavior if no regressions are present.
-3. Start Phase 2 with tests, not GUI changes: define protected literal phrases
-   and unambiguous local punctuation-command cases.
-4. Implement the local command parser behind a setting or isolated class so it
-   can be tested without replacing the stable candidate immediately.
-5. Do not add an unconditional `colon` → `Colin` correction.
-6. Build candidate 3 only after parser tests pass, then run the five-repeat live
-   acceptance matrix before any push, pull request, tag, or release.
+2. Run the five-repeat live punctuation acceptance matrix with candidate 3 and
+   review the resulting history for false command replacements.
+3. Preserve the local fast path and route only genuinely ambiguous remnants to
+   AI cleanup.
+4. Do not add an unconditional `colon` → `Colin` correction.
+5. Prototype correction recognition only within the safety constraints in
+   `CORRECTION_LEARNING_SCOPE.md`.
+6. Do not push, tag, or publish until the live acceptance matrix passes.

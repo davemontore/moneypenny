@@ -4,6 +4,30 @@ Significant project decisions, with date, reason, and practical consequence.
 
 ---
 
+## 2026-08-25 — Common punctuation commands must not depend on a cleanup model
+
+**Decision:** Parse paired quotes and common verbal punctuation locally before
+the optional contextual cleanup pass. Preserve explicit literal forms such as
+"the word comma", "a colon", and "say colon". Migrate the retired Groq cleanup
+model from `llama-3.1-8b-instant` to `openai/gpt-oss-20b` for remaining
+ambiguities.
+
+**Reason:** Groq shut down `llama-3.1-8b-instant` on August 16, 2026. The app's
+safe raw-text fallback then made every punctuation request appear to succeed
+while leaking the spoken commands into the final text. A deterministic local
+path keeps core dictation behavior available through model retirement, network
+failure, missing credentials, and Cleanup Off mode.
+
+**Practical consequence:** `quote ... end quote`, the existing quote variants,
+single punctuation commands, line breaks, parentheses, and slashes add no
+network latency. Literal and unmatched forms can still reach contextual cleanup
+when enabled. Existing saved model settings migrate automatically.
+
+Sources: https://console.groq.com/docs/deprecations and
+https://console.groq.com/docs/models
+
+---
+
 ## 2026-08-12 — Context-aware cleanup replaces punctuation heuristics
 
 **Decision:** Raw speech recognition is followed by a selective Groq `llama-3.1-8b-instant` cleanup pass. Commands-only mode is the default: ordinary dictation returns immediately, while transcripts containing likely verbal punctuation receive contextual cleanup. Off and Always modes remain available. The cleaner returns the raw transcript unchanged when its call fails.

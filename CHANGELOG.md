@@ -1,9 +1,15 @@
 # Voice Typing App - Changelog
 
 ## Version 3.1.1 - Correction Pipeline
-*In development*
+*Released: August 25, 2026*
 
 ### Current Changes
+- Added opt-out correction recognition: immediate Backspace-and-retype edits within 10 seconds produce a confirm-before-save exact-correction suggestion
+- Correction recognition is limited to the same focused control, cancels on mouse/navigation/window changes, skips detectable secure fields, and never suppresses user input
+- Fixed verbal punctuation failures caused by Groq's retirement of `llama-3.1-8b-instant`; existing settings migrate to `openai/gpt-oss-20b`
+- Added dependency-free local parsing for paired quotes (`quote ... end quote` included), common punctuation, line breaks, parentheses, and slashes
+- Protected explicit literal forms such as `the word comma`, `a colon`, and `say colon` from local command replacement
+- Clicking a MoneyPenny shortcut while the app is already running now restores and focuses the existing GUI instead of showing an "already running" dialog
 - Split the Dictionary into soft preferred-vocabulary hints and deterministic exact corrections
 - Added local heard-as → type-as rules with whole-phrase matching, longest-match priority, and exact output casing/symbols
 - Added narrow local repair for impossible punctuation collisions such as `:.` and `,?`

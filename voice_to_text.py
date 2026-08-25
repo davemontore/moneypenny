@@ -61,6 +61,9 @@ SETTINGS_FILE = APP_DIR / "settings.json"
 LEXICON_FILE = APP_DIR / "lexicon.txt"
 CORRECTIONS_FILE = APP_DIR / "corrections.json"
 HISTORY_FILE = APP_DIR / "transcript_history.jsonl"
+SINGLE_INSTANCE_MUTEX_NAME = "Global\\MoneyPennyVoiceTypingMutex"
+ACTIVATE_WINDOW_EVENT_NAME = "Global\\MoneyPennyActivateWindowEvent"
+MAIN_WINDOW_TITLE = "MoneyPenny Voice Typing"
 
 
 def configure_logging() -> logging.Logger:
@@ -118,8 +121,20 @@ def _acquire_single_instance_lock():
     """
     try:
         import ctypes
+        from ctypes import wintypes
+
         kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        mutex = kernel32.CreateMutexW(None, False, "Global\\MoneyPennyVoiceTypingMutex")
+        kernel32.CreateMutexW.argtypes = [
+            ctypes.c_void_p,
+            wintypes.BOOL,
+            wintypes.LPCWSTR,
+        ]
+        kernel32.CreateMutexW.restype = wintypes.HANDLE
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+
+        ctypes.set_last_error(0)
+        mutex = kernel32.CreateMutexW(None, False, SINGLE_INSTANCE_MUTEX_NAME)
         ERROR_ALREADY_EXISTS = 183
         if not mutex or ctypes.get_last_error() == ERROR_ALREADY_EXISTS:
             # Another copy owns the lock. IMPORTANT: CreateMutexW opened a
@@ -137,26 +152,108 @@ def _acquire_single_instance_lock():
         return True
 
 
-def _notify_already_running():
-    """Tell the user MoneyPenny is already running, then exit."""
+def _create_activation_event():
+    """Create the signal that asks the primary instance to show its GUI."""
     try:
-        import tkinter as tk
-        from tkinter import messagebox
-        root = tk.Tk()
-        root.withdraw()
-        messagebox.showinfo(
-            "MoneyPenny",
-            "MoneyPenny is already running — no need to open it again.\n\n"
-            "Note: closing the MoneyPenny window does NOT quit the app.\n"
-            "It hides to the system tray so it can keep listening for your "
-            "hotkey. Look for its icon near the clock (you may need to click "
-            "the small ^ arrow to see it).\n\n"
-            "To fully quit: right-click the tray icon and choose Exit, "
-            "or press Ctrl+Alt+Q.",
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateEventW.argtypes = [
+            ctypes.c_void_p,
+            wintypes.BOOL,
+            wintypes.BOOL,
+            wintypes.LPCWSTR,
+        ]
+        kernel32.CreateEventW.restype = wintypes.HANDLE
+        event_handle = kernel32.CreateEventW(
+            None, False, False, ACTIVATE_WINDOW_EVENT_NAME
         )
-        root.destroy()
+        if not event_handle:
+            raise ctypes.WinError(ctypes.get_last_error())
+        return event_handle
     except Exception:
-        logger.warning("MoneyPenny is already running; second instance exiting.")
+        logger.exception("Could not create the window activation event")
+        return None
+
+
+def _signal_existing_instance():
+    """Ask the running instance to restore its GUI, without showing a dialog."""
+    signaled = False
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.OpenEventW.argtypes = [
+            wintypes.DWORD,
+            wintypes.BOOL,
+            wintypes.LPCWSTR,
+        ]
+        kernel32.OpenEventW.restype = wintypes.HANDLE
+        kernel32.SetEvent.argtypes = [wintypes.HANDLE]
+        kernel32.SetEvent.restype = wintypes.BOOL
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+
+        EVENT_MODIFY_STATE = 0x0002
+        event_handle = kernel32.OpenEventW(
+            EVENT_MODIFY_STATE, False, ACTIVATE_WINDOW_EVENT_NAME
+        )
+        if event_handle:
+            signaled = bool(kernel32.SetEvent(event_handle))
+            kernel32.CloseHandle(event_handle)
+    except Exception:
+        logger.exception("Could not signal the running MoneyPenny instance")
+
+    # The newly launched process owns Windows' foreground permission, so it
+    # performs the final focus request after the primary process restores the
+    # Tk window in response to the event above.
+    focused = _focus_existing_window()
+    logger.info(
+        "MoneyPenny is already running; activation signaled=%s focused=%s",
+        signaled,
+        focused,
+    )
+
+
+def _focus_existing_window(timeout_seconds=1.5):
+    """Bring the existing GUI forward from the user-launched second process."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        user32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+        user32.FindWindowW.restype = wintypes.HWND
+        user32.IsIconic.argtypes = [wintypes.HWND]
+        user32.IsIconic.restype = wintypes.BOOL
+        user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+        user32.ShowWindow.restype = wintypes.BOOL
+        user32.BringWindowToTop.argtypes = [wintypes.HWND]
+        user32.BringWindowToTop.restype = wintypes.BOOL
+        user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+        user32.SetForegroundWindow.restype = wintypes.BOOL
+
+        SW_SHOW = 5
+        SW_RESTORE = 9
+        deadline = time.monotonic() + timeout_seconds
+        while True:
+            window_handle = user32.FindWindowW(None, MAIN_WINDOW_TITLE)
+            if window_handle:
+                show_command = (
+                    SW_RESTORE if user32.IsIconic(window_handle) else SW_SHOW
+                )
+                user32.ShowWindow(window_handle, show_command)
+                user32.BringWindowToTop(window_handle)
+                user32.SetForegroundWindow(window_handle)
+                return True
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(0.05)
+    except Exception:
+        logger.exception("Could not bring the running MoneyPenny window forward")
+        return False
 
 
 # --- Configuration ---
@@ -177,7 +274,8 @@ DEFAULT_SETTINGS = {
     "groq_api_key": "",
     "groq_model": "whisper-large-v3-turbo",
     "cleanup_mode": "commands",  # "off", "commands", or "always"
-    "cleanup_model": "llama-3.1-8b-instant",
+    "cleanup_model": "openai/gpt-oss-20b",
+    "correction_recognition_enabled": True,
     "record_hotkey": "right ctrl",
     "selected_microphone": None,  # None = system default
 }
@@ -191,6 +289,7 @@ class Settings:
         self.load()
 
     def load(self):
+        migrated = False
         try:
             if SETTINGS_FILE.exists():
                 with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
@@ -205,7 +304,20 @@ class Settings:
                 for key in DEFAULT_SETTINGS:
                     if key in saved:
                         self.settings[key] = saved[key]
+
+                # Groq retired llama-3.1-8b-instant on 2026-08-16. Existing
+                # installations keep their saved model forever unless we
+                # migrate it, which made every punctuation cleanup silently
+                # fall back to the raw transcript.
+                if self.settings.get("cleanup_model") == "llama-3.1-8b-instant":
+                    self.settings["cleanup_model"] = "openai/gpt-oss-20b"
+                    migrated = True
+                    logger.info(
+                        "Migrated retired cleanup model to openai/gpt-oss-20b"
+                    )
                 logger.info("Settings loaded from %s", SETTINGS_FILE)
+                if migrated:
+                    self.save()
         except Exception:
             logger.exception("Failed to load settings, using defaults")
 
@@ -395,6 +507,294 @@ class ExactCorrections:
         return self._pattern.sub(replace_match, text), applied
 
 
+class CorrectionTracker:
+    """Track a short, direct Backspace-and-retype correction at the caret."""
+
+    WINDOW_SECONDS = 10.0
+    IDLE_SECONDS = 1.0
+    MAX_BACKSPACES = 100
+    MAX_REPLACEMENT_CHARS = 120
+    MAX_RULE_CHARS = 80
+    MAX_RULE_WORDS = 5
+
+    _IGNORED_MODIFIERS = {
+        "shift", "left shift", "right shift", "caps lock",
+    }
+    _CANCEL_KEYS = {
+        "delete", "insert", "home", "end", "page up", "page down",
+        "up", "down", "left", "right", "tab", "enter", "esc", "escape",
+        "ctrl", "left ctrl", "right ctrl", "alt", "left alt", "right alt",
+        "windows", "left windows", "right windows", "cmd",
+    }
+    _SHIFTED_CHARACTERS = {
+        "1": "!", "2": "@", "3": "#", "4": "$", "5": "%",
+        "6": "^", "7": "&", "8": "*", "9": "(", "0": ")",
+        "-": "_", "=": "+", "[": "{", "]": "}", "\\": "|",
+        ";": ":", "'": '"', ",": "<", ".": ">", "/": "?",
+        "`": "~",
+    }
+
+    def __init__(self, clock=time.monotonic):
+        self.clock = clock
+        self.lock = threading.RLock()
+        self._reset()
+
+    def _reset(self):
+        self.original_text = ""
+        self.context = None
+        self.deadline = 0.0
+        self.last_input_at = None
+        self.backspaces = 0
+        self.replacement = ""
+
+    @property
+    def active(self) -> bool:
+        with self.lock:
+            return bool(self.original_text)
+
+    def arm(self, text: str, context, now=None) -> bool:
+        """Begin watching only after MoneyPenny finishes injecting text."""
+        with self.lock:
+            self._reset()
+            if not text or context is None:
+                return False
+            current = self.clock() if now is None else now
+            self.original_text = text
+            self.context = context
+            self.deadline = current + self.WINDOW_SECONDS
+            return True
+
+    def cancel(self):
+        with self.lock:
+            self._reset()
+
+    def handle_key(
+        self,
+        name: str,
+        context,
+        *,
+        shift=False,
+        caps_lock=False,
+        ctrl=False,
+        alt=False,
+        now=None,
+    ):
+        """Consume one physical key-down event without suppressing it."""
+        with self.lock:
+            if not self.original_text:
+                return
+            current = self.clock() if now is None else now
+            if current > self.deadline or context != self.context:
+                self._reset()
+                return
+
+            key = (name or "").casefold()
+            if key in self._IGNORED_MODIFIERS:
+                return
+            if ctrl or alt or key in self._CANCEL_KEYS or key.startswith("f") and key[1:].isdigit():
+                self._reset()
+                return
+
+            if key == "backspace":
+                if self.replacement:
+                    self.replacement = self.replacement[:-1]
+                elif self.backspaces < min(len(self.original_text), self.MAX_BACKSPACES):
+                    self.backspaces += 1
+                else:
+                    self._reset()
+                    return
+                self.last_input_at = current
+                return
+
+            character = self._key_to_character(key, shift, caps_lock)
+            if character is None or not self.backspaces:
+                self._reset()
+                return
+            self.replacement += character
+            self.last_input_at = current
+            if len(self.replacement) > self.MAX_REPLACEMENT_CHARS:
+                self._reset()
+
+    def poll(self, context, now=None):
+        """Return a completed (heard, written) suggestion after typing idles."""
+        with self.lock:
+            if not self.original_text:
+                return None
+            current = self.clock() if now is None else now
+            if context != self.context:
+                self._reset()
+                return None
+            expired = current >= self.deadline
+            idle = (
+                self.last_input_at is not None
+                and current - self.last_input_at >= self.IDLE_SECONDS
+            )
+            if not expired and not (idle and self.replacement):
+                return None
+
+            corrected = (
+                self.original_text[:-self.backspaces]
+                if self.backspaces
+                else self.original_text
+            ) + self.replacement
+            original = self.original_text
+            self._reset()
+            return self._derive_rule(original, corrected)
+
+    @classmethod
+    def _derive_rule(cls, original: str, corrected: str):
+        """Expand a character diff to safe whole-word correction boundaries."""
+        if not original or original == corrected:
+            return None
+
+        prefix = 0
+        prefix_limit = min(len(original), len(corrected))
+        while prefix < prefix_limit and original[prefix] == corrected[prefix]:
+            prefix += 1
+
+        suffix = 0
+        suffix_limit = min(len(original) - prefix, len(corrected) - prefix)
+        while (
+            suffix < suffix_limit
+            and original[len(original) - suffix - 1]
+            == corrected[len(corrected) - suffix - 1]
+        ):
+            suffix += 1
+
+        old_end = len(original) - suffix
+        new_end = len(corrected) - suffix
+
+        def word_character(character):
+            return character.isalnum() or character in "_'-"
+
+        while prefix > 0 and (
+            word_character(original[prefix - 1])
+            or word_character(corrected[prefix - 1])
+        ):
+            prefix -= 1
+        while old_end < len(original) and word_character(original[old_end]):
+            old_end += 1
+        while new_end < len(corrected) and word_character(corrected[new_end]):
+            new_end += 1
+
+        trim = " \t\r\n.,!?;:\"()[]{}"
+        heard = original[prefix:old_end].strip(trim)
+        written = corrected[prefix:new_end].strip(trim)
+        if not heard or not written or heard == written:
+            return None
+        if not any(character.isalnum() for character in heard):
+            return None
+        if not any(character.isalnum() for character in written):
+            return None
+        if len(heard) > cls.MAX_RULE_CHARS or len(written) > cls.MAX_RULE_CHARS:
+            return None
+        if len(heard.split()) > cls.MAX_RULE_WORDS or len(written.split()) > cls.MAX_RULE_WORDS:
+            return None
+        return heard, written
+
+    @classmethod
+    def _key_to_character(cls, key: str, shift: bool, caps_lock: bool):
+        if key == "space":
+            return " "
+        if len(key) != 1:
+            return None
+        if key.isalpha():
+            return key.upper() if shift ^ caps_lock else key.lower()
+        if shift:
+            return cls._SHIFTED_CHARACTERS.get(key, key)
+        return key
+
+
+def _get_keyboard_focus_context():
+    """Return ((foreground window, focused control), is_secure_field)."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class GUITHREADINFO(ctypes.Structure):
+            _fields_ = [
+                ("cbSize", wintypes.DWORD),
+                ("flags", wintypes.DWORD),
+                ("hwndActive", wintypes.HWND),
+                ("hwndFocus", wintypes.HWND),
+                ("hwndCapture", wintypes.HWND),
+                ("hwndMenuOwner", wintypes.HWND),
+                ("hwndMoveSize", wintypes.HWND),
+                ("hwndCaret", wintypes.HWND),
+                ("rcCaret", wintypes.RECT),
+            ]
+
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        user32.GetForegroundWindow.restype = wintypes.HWND
+        foreground = user32.GetForegroundWindow()
+        if not foreground:
+            return None, False
+
+        user32.GetWindowThreadProcessId.argtypes = [
+            wintypes.HWND,
+            ctypes.POINTER(wintypes.DWORD),
+        ]
+        user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+        thread_id = user32.GetWindowThreadProcessId(foreground, None)
+        info = GUITHREADINFO(cbSize=ctypes.sizeof(GUITHREADINFO))
+        user32.GetGUIThreadInfo.argtypes = [
+            wintypes.DWORD,
+            ctypes.POINTER(GUITHREADINFO),
+        ]
+        user32.GetGUIThreadInfo.restype = wintypes.BOOL
+        focused = foreground
+        if user32.GetGUIThreadInfo(thread_id, ctypes.byref(info)) and info.hwndFocus:
+            focused = info.hwndFocus
+
+        # Standard Win32 Edit controls expose a non-zero password character.
+        # Browser and custom controls may not, so recognition remains opt-out.
+        class_name = ctypes.create_unicode_buffer(128)
+        user32.GetClassNameW.argtypes = [
+            wintypes.HWND,
+            wintypes.LPWSTR,
+            ctypes.c_int,
+        ]
+        user32.GetClassNameW.restype = ctypes.c_int
+        user32.GetClassNameW(focused, class_name, len(class_name))
+        is_secure = False
+        if class_name.value.casefold() == "edit":
+            EM_GETPASSWORDCHAR = 0x00D2
+            user32.SendMessageW.restype = wintypes.LPARAM
+            is_secure = bool(
+                user32.SendMessageW(focused, EM_GETPASSWORDCHAR, 0, 0)
+            )
+
+        return (int(foreground), int(focused)), is_secure
+    except Exception:
+        logger.exception(
+            "Could not inspect the focused control for correction recognition"
+        )
+        return None, False
+
+
+def _mouse_button_is_pressed() -> bool:
+    try:
+        import ctypes
+
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        user32.GetAsyncKeyState.argtypes = [ctypes.c_int]
+        user32.GetAsyncKeyState.restype = ctypes.c_short
+        return any(
+            user32.GetAsyncKeyState(vk) & 0x8000 for vk in (0x01, 0x02, 0x04)
+        )
+    except Exception:
+        return False
+
+
+def _caps_lock_is_on() -> bool:
+    try:
+        import ctypes
+
+        return bool(ctypes.WinDLL("user32").GetKeyState(0x14) & 1)
+    except Exception:
+        return False
+
+
 def normalize_punctuation_collisions(text: str) -> str:
     """Resolve impossible punctuation collisions without rewriting language."""
     if not text:
@@ -407,6 +807,126 @@ def normalize_punctuation_collisions(text: str) -> str:
     text = re.sub(r",([!?])", r"\1", text)
     text = re.sub(r",\.(?!\.)", ".", text)
     return text
+
+
+_QUOTE_EXPLICIT_PATTERN = re.compile(
+    r"(?<!\w)(?:open\s+quote|quote)(?!\w)[,:]?\s+"
+    r"(?P<content>.+?)\s+(?:end\s+quote|close\s+quote)(?!\w)",
+    re.IGNORECASE,
+)
+_QUOTE_PAIRED_PATTERN = re.compile(
+    r"(?<!\w)quote(?!\w)[,:]?\s+(?P<content>.+?)\s+quote(?!\w)",
+    re.IGNORECASE,
+)
+
+_SPOKEN_COMMANDS = {
+    "new paragraph": "\n\n",
+    "new line": "\n",
+    "newline": "\n",
+    "open parenthesis": "(",
+    "open parentheses": "(",
+    "close parenthesis": ")",
+    "close parentheses": ")",
+    "question mark": "?",
+    "exclamation point": "!",
+    "exclamation mark": "!",
+    "full stop": ".",
+    "backslash": "\\",
+    "semicolon": ";",
+    "comma": ",",
+    "period": ".",
+    "colon": ":",
+    "slash": "/",
+}
+_SPOKEN_COMMAND_PATTERN = re.compile(
+    r"(?<!\w)(?:"
+    + "|".join(
+        sorted(
+            (re.escape(command) for command in _SPOKEN_COMMANDS),
+            key=len,
+            reverse=True,
+        )
+    )
+    + r")(?!\w)",
+    re.IGNORECASE,
+)
+_LITERAL_PRECEDING_WORDS = {
+    "a", "an", "the", "word", "term", "phrase", "command", "symbol",
+    "say", "saying", "said", "called", "named", "spell", "spelled",
+    "type", "typed", "write", "written", "use", "using", "mention",
+}
+_LITERAL_FOLLOWING_WORDS = {
+    "word", "term", "phrase", "command", "symbol", "punctuation",
+}
+
+
+def _is_literal_punctuation_reference(text: str, start: int, end: int) -> bool:
+    """Recognize explicit discussion of a punctuation word, not a command."""
+    preceding_words = re.findall(r"[A-Za-z']+", text[:start].casefold())
+    following_words = re.findall(r"[A-Za-z']+", text[end:].casefold())
+    previous = preceding_words[-1] if preceding_words else ""
+    following = following_words[0] if following_words else ""
+    if previous in _LITERAL_PRECEDING_WORDS:
+        return True
+    if following in _LITERAL_FOLLOWING_WORDS:
+        return True
+    return False
+
+
+def _normalize_spoken_command_spacing(text: str) -> str:
+    """Normalize only the spacing forms introduced by verbal commands."""
+    text = re.sub(r"[ \t]+([,.;:!?])", r"\1", text)
+    # Whisper may supply punctuation beside the still-verbal command. Once
+    # the command becomes a symbol, collapse only those impossible doubles.
+    text = re.sub(r"([,;:!?])\1+", r"\1", text)
+    text = re.sub(r"(?<!\.)\.\.(?!\.)", ".", text)
+    text = re.sub(r"([!?])[.,]", r"\1", text)
+    text = re.sub(r"([,;:!?])(?=[A-Za-z0-9])", r"\1 ", text)
+    text = re.sub(r"(?<!\.)\.(?=[A-Za-z])", ". ", text)
+    text = re.sub(r"\(\s+", "(", text)
+    text = re.sub(r"\s+\)", ")", text)
+    text = re.sub(r"[ \t]*([/\\])[ \t]*", r"\1", text)
+    text = re.sub(r"[ \t]*\n[ \t]*", "\n", text)
+    # A terminal command spoken after a closing quote belongs inside it.
+    text = re.sub(r'"([.!?])', r'\1"', text)
+    return text.strip()
+
+
+def apply_spoken_punctuation(text: str) -> tuple[str, list]:
+    """Apply common verbal punctuation locally, without an API dependency.
+
+    Paired quote forms are deterministic. Single punctuation words are kept
+    literal after explicit cues such as "the word", "a", "say", or "use";
+    genuinely ambiguous prose can still be handled by the optional AI pass.
+    """
+    if not text:
+        return text, []
+
+    applied = []
+
+    def replace_quote(match):
+        content = match.group("content").strip()
+        if not content:
+            return match.group(0)
+        applied.append({"command": "quote pair", "written": f'"{content}"'})
+        return f'"{content}"'
+
+    text = _QUOTE_EXPLICIT_PATTERN.sub(replace_quote, text)
+    text = _QUOTE_PAIRED_PATTERN.sub(replace_quote, text)
+
+    def replace_command(match):
+        if _is_literal_punctuation_reference(text, match.start(), match.end()):
+            return match.group(0)
+        command = " ".join(match.group(0).casefold().split())
+        written = _SPOKEN_COMMANDS[command]
+        applied.append({"command": match.group(0), "written": written})
+        return written
+
+    text = _SPOKEN_COMMAND_PATTERN.sub(replace_command, text)
+    if applied:
+        text = _normalize_spoken_command_spacing(text)
+        text = normalize_punctuation_collisions(text)
+    return text, applied
 
 
 class TranscriptHistory:
@@ -554,7 +1074,7 @@ If the transcript is empty or only filler, return exactly EMPTY."""
             logger.warning(self.last_error)
             return raw, False
 
-        model = self.settings.get("cleanup_model", "llama-3.1-8b-instant")
+        model = self.settings.get("cleanup_model", "openai/gpt-oss-20b")
         payload = {
             "model": model,
             "temperature": 0,
@@ -809,6 +1329,7 @@ class MoneyPennyApp:
         self.transcriber = Transcriber(self.settings, self.lexicon)
         self.cleaner = TranscriptCleaner(self.settings)
         self.history = TranscriptHistory()
+        self.correction_tracker = CorrectionTracker()
 
         # Audio state
         self.is_recording = False
@@ -822,10 +1343,13 @@ class MoneyPennyApp:
         # GUI state
         self.gui = None
         self.tray_icon = None
+        self.activation_event_handle = None
+        self.correction_hook = None
 
         # Status callbacks
         self.status_callbacks = []
         self.history_callbacks = []
+        self.correction_suggestion_callbacks = []
 
     def add_status_callback(self, callback):
         """Register a callback for status updates."""
@@ -834,6 +1358,10 @@ class MoneyPennyApp:
     def add_history_callback(self, callback):
         """Register a callback for captured-transcript history updates."""
         self.history_callbacks.append(callback)
+
+    def add_correction_suggestion_callback(self, callback):
+        """Register a GUI callback for confirm-before-save suggestions."""
+        self.correction_suggestion_callbacks.append(callback)
 
     def load_model_async(self):
         """Load the Whisper model in a background thread.
@@ -870,6 +1398,13 @@ class MoneyPennyApp:
             except Exception:
                 pass
 
+    def _notify_correction_suggestion(self, heard: str, written: str):
+        for callback in self.correction_suggestion_callbacks:
+            try:
+                callback(heard, written)
+            except Exception:
+                pass
+
     def get_microphones(self) -> list:
         """Get list of available microphone devices."""
         devices = []
@@ -887,6 +1422,7 @@ class MoneyPennyApp:
 
     def start_recording(self):
         """Begin recording when hotkey is pressed."""
+        self.correction_tracker.cancel()
         if self.is_recording:
             return
         with self.frames_lock:
@@ -923,6 +1459,9 @@ class MoneyPennyApp:
             text, applied_corrections = self.corrections.apply(text)
             if applied_corrections:
                 logger.info("Applied exact corrections: %s", applied_corrections)
+            text, applied_commands = apply_spoken_punctuation(text)
+            if applied_commands:
+                logger.info("Applied local punctuation commands: %s", applied_commands)
             if self.cleaner.should_clean(text):
                 self._notify_status("cleaning", "Applying context-aware cleanup...")
             text, cleanup_used = self.cleaner.clean(text)
@@ -944,6 +1483,7 @@ class MoneyPennyApp:
 
             # Type the text
             self.keyboard_controller.type(" " + text)
+            self._arm_correction_recognition(text)
         else:
             if self.transcriber.last_error:
                 logger.warning("Transcription failed: %s", self.transcriber.last_error)
@@ -1035,6 +1575,85 @@ class MoneyPennyApp:
             logger.exception("Failed to register hotkeys")
             raise
 
+    def _setup_correction_recognition(self):
+        """Observe a narrow post-dictation correction window without suppression."""
+        if self.correction_hook is not None:
+            return
+
+        def _on_key(event):
+            if event.event_type != "down" or not self.correction_tracker.active:
+                return
+            if not self.settings.get("correction_recognition_enabled", True):
+                self.correction_tracker.cancel()
+                return
+            context, is_secure = _get_keyboard_focus_context()
+            if is_secure:
+                self.correction_tracker.cancel()
+                return
+            try:
+                self.correction_tracker.handle_key(
+                    event.name,
+                    context,
+                    shift=keyboard.is_pressed("shift"),
+                    caps_lock=_caps_lock_is_on(),
+                    ctrl=keyboard.is_pressed("ctrl"),
+                    alt=keyboard.is_pressed("alt"),
+                )
+            except Exception:
+                logger.exception("Correction recognition key handler failed")
+                self.correction_tracker.cancel()
+
+        self.correction_hook = keyboard.hook(_on_key, suppress=False)
+        threading.Thread(
+            target=self._correction_monitor_func,
+            name="MoneyPennyCorrectionMonitor",
+            daemon=True,
+        ).start()
+        logger.info("Correction recognition enabled: 10-second direct-edit window")
+
+    def _arm_correction_recognition(self, text: str):
+        if (
+            self.correction_hook is None
+            or not self.settings.get("correction_recognition_enabled", True)
+        ):
+            return
+        context, is_secure = _get_keyboard_focus_context()
+        if is_secure:
+            logger.info("Correction recognition skipped for a secure field")
+            return
+        if self.correction_tracker.arm(text, context):
+            logger.info("Correction recognition armed for 10 seconds")
+
+    def _correction_monitor_func(self):
+        while not self.stop_event.is_set():
+            if not self.correction_tracker.active:
+                time.sleep(0.05)
+                continue
+            if _mouse_button_is_pressed():
+                self.correction_tracker.cancel()
+                logger.info("Correction recognition canceled by mouse input")
+                time.sleep(0.1)
+                continue
+            context, is_secure = _get_keyboard_focus_context()
+            if is_secure:
+                self.correction_tracker.cancel()
+                continue
+            suggestion = self.correction_tracker.poll(context)
+            if suggestion:
+                heard, written = suggestion
+                logger.info(
+                    "Correction recognition suggested: %r -> %r", heard, written
+                )
+                self._notify_correction_suggestion(heard, written)
+            time.sleep(0.05)
+
+    def accept_correction_suggestion(self, heard: str, written: str) -> bool:
+        if self.corrections.add(heard, written):
+            logger.info("Learned confirmed correction: %r -> %r", heard, written)
+            return True
+        logger.info("Did not learn duplicate correction for %r", heard)
+        return False
+
     def shutdown(self):
         """Gracefully shut down the application."""
         if self.stop_event.is_set():
@@ -1043,6 +1662,14 @@ class MoneyPennyApp:
         self._notify_status("shutdown", "Exiting...")
         self.is_recording = False
         self.stop_event.set()
+        self.correction_tracker.cancel()
+
+        if self.correction_hook is not None:
+            try:
+                keyboard.unhook(self.correction_hook)
+            except Exception:
+                pass
+            self.correction_hook = None
 
         # Force exit after short delay if graceful shutdown fails
         def force_exit():
@@ -1113,6 +1740,9 @@ class MoneyPennyApp:
 
         # Create and show the GUI immediately so the window appears right away.
         self.gui = MoneyPennyGUI(self)
+        self.gui.create_window()
+        self._setup_correction_recognition()
+        self._start_activation_listener()
         self.tray_icon = create_tray_icon(self, self.gui)
 
         # Run tray in background thread
@@ -1124,6 +1754,34 @@ class MoneyPennyApp:
 
         # Run GUI main loop
         self.gui.run()
+
+    def _start_activation_listener(self):
+        """Forward second-launch requests without touching Tk off-thread."""
+        if not self.activation_event_handle or not self.gui:
+            return
+
+        def _listen():
+            try:
+                import ctypes
+                from ctypes import wintypes
+
+                kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+                kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+                kernel32.WaitForSingleObject.restype = wintypes.DWORD
+                WAIT_OBJECT_0 = 0
+                while not self.stop_event.is_set():
+                    if kernel32.WaitForSingleObject(
+                        self.activation_event_handle, 250
+                    ) == WAIT_OBJECT_0:
+                        self.gui.request_activation()
+            except Exception:
+                logger.exception("Window activation listener stopped unexpectedly")
+
+        threading.Thread(
+            target=_listen,
+            name="MoneyPennyActivationListener",
+            daemon=True,
+        ).start()
 
     def _quit_from_gui(self):
         """Handle quit from GUI or hotkey."""
@@ -1151,10 +1809,12 @@ def main():
 
     instance_lock = _acquire_single_instance_lock()
     if instance_lock is None:
-        _notify_already_running()
+        _signal_existing_instance()
         sys.exit(0)
 
+    activation_event = _create_activation_event()
     app = MoneyPennyApp()
+    app.activation_event_handle = activation_event
 
     # Install signal handlers
     try:

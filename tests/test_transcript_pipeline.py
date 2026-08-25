@@ -6,10 +6,14 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from voice_to_text import (
+    CorrectionTracker,
     ExactCorrections,
+    MoneyPennyApp,
+    Settings,
     TranscriptCleaner,
     TranscriptHistory,
     Transcriber,
+    apply_spoken_punctuation,
     normalize_punctuation_collisions,
 )
 
@@ -20,6 +24,122 @@ class FakeSettings:
 
     def get(self, key, default=None):
         return self.values.get(key, default)
+
+
+class SettingsMigrationTests(unittest.TestCase):
+    def test_retired_cleanup_model_is_migrated_and_saved(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "settings.json"
+            path.write_text(
+                json.dumps({"cleanup_model": "llama-3.1-8b-instant"}),
+                encoding="utf-8",
+            )
+
+            with patch("voice_to_text.SETTINGS_FILE", path):
+                settings = Settings()
+
+            self.assertEqual(
+                settings.get("cleanup_model"),
+                "openai/gpt-oss-20b",
+            )
+            saved = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(saved["cleanup_model"], "openai/gpt-oss-20b")
+
+
+class CorrectionTrackerTests(unittest.TestCase):
+    def setUp(self):
+        self.now = 100.0
+        self.context = (10, 20)
+        self.tracker = CorrectionTracker(clock=lambda: self.now)
+
+    def type_key(self, name, **modifiers):
+        self.tracker.handle_key(name, self.context, now=self.now, **modifiers)
+        self.now += 0.05
+
+    def finish(self):
+        self.now += CorrectionTracker.IDLE_SECONDS
+        return self.tracker.poll(self.context, now=self.now)
+
+    def test_immediate_backspace_and_retype_suggests_whole_word(self):
+        self.tracker.arm("The app Adds", self.context, now=self.now)
+        for _ in "Adds":
+            self.type_key("backspace")
+        for character in "adds":
+            self.type_key(character)
+
+        self.assertEqual(self.finish(), ("Adds", "adds"))
+
+    def test_spacing_correction_expands_to_complete_words(self):
+        self.tracker.arm("I use Alot.", self.context, now=self.now)
+        for _ in "Alot.":
+            self.type_key("backspace")
+        for character in "a lot.":
+            self.type_key("space" if character == " " else character)
+
+        self.assertEqual(self.finish(), ("Alot", "a lot"))
+
+    def test_ordinary_typing_after_transcript_cancels(self):
+        self.tracker.arm("Published text", self.context, now=self.now)
+        self.type_key("space")
+        self.type_key("n")
+
+        self.assertIsNone(self.finish())
+        self.assertFalse(self.tracker.active)
+
+    def test_navigation_or_window_change_cancels(self):
+        self.tracker.arm("Wrong", self.context, now=self.now)
+        self.type_key("left")
+        self.assertFalse(self.tracker.active)
+
+        self.tracker.arm("Wrong", self.context, now=self.now)
+        self.tracker.handle_key("backspace", (99, 20), now=self.now)
+        self.assertFalse(self.tracker.active)
+
+    def test_expired_window_does_not_suggest(self):
+        self.tracker.arm("Wrong", self.context, now=self.now)
+        self.now += CorrectionTracker.WINDOW_SECONDS + 0.01
+        self.type_key("backspace")
+
+        self.assertIsNone(self.finish())
+
+    def test_retyping_same_text_does_not_suggest(self):
+        self.tracker.arm("Fine", self.context, now=self.now)
+        self.type_key("backspace")
+        self.type_key("e")
+
+        self.assertIsNone(self.finish())
+
+    def test_shift_and_caps_lock_are_reconstructed(self):
+        self.tracker.arm("lower", self.context, now=self.now)
+        for _ in "lower":
+            self.type_key("backspace")
+        self.type_key("u", shift=True)
+        for character in "pper":
+            self.type_key(character)
+
+        self.assertEqual(self.finish(), ("lower", "Upper"))
+
+    def test_punctuation_only_edit_is_rejected(self):
+        self.tracker.arm("Hello.", self.context, now=self.now)
+        self.type_key("backspace")
+        self.type_key(",")
+
+        self.assertIsNone(self.finish())
+
+
+class CorrectionSuggestionPersistenceTests(unittest.TestCase):
+    def test_confirmed_suggestion_persists_through_exact_corrections(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "corrections.json"
+            app = MoneyPennyApp.__new__(MoneyPennyApp)
+            app.corrections = ExactCorrections(path)
+
+            self.assertTrue(app.accept_correction_suggestion("Alot", "a lot"))
+
+            reloaded = ExactCorrections(path)
+            corrected, applied = reloaded.apply("I use alot.")
+            self.assertEqual(corrected, "I use a lot.")
+            self.assertEqual(len(applied), 1)
 
 
 class ExactCorrectionsTests(unittest.TestCase):
@@ -68,6 +188,71 @@ class ExactCorrectionsTests(unittest.TestCase):
 
 
 class PunctuationNormalizationTests(unittest.TestCase):
+    def test_user_reported_end_quote_case(self):
+        text, applied = apply_spoken_punctuation(
+            "The quotation feature where I quote use it to do something like "
+            "this end quote isn't working for some reason."
+        )
+
+        self.assertEqual(
+            text,
+            'The quotation feature where I "use it to do something like this" '
+            "isn't working for some reason.",
+        )
+        self.assertEqual(len(applied), 1)
+
+    def test_supported_quote_pair_variants(self):
+        cases = {
+            "Say open quote, this works close quote now.": 'Say "this works" now.',
+            "Say quote this works quote now.": 'Say "this works" now.',
+            "Say quote this works end quote now.": 'Say "this works" now.',
+        }
+        for raw, expected in cases.items():
+            with self.subTest(raw=raw):
+                text, _ = apply_spoken_punctuation(raw)
+                self.assertEqual(text, expected)
+
+    def test_common_commands_are_applied_locally(self):
+        text, applied = apply_spoken_punctuation(
+            "First comma second period new paragraph Is this right question mark"
+        )
+
+        self.assertEqual(text, "First, second.\n\nIs this right?")
+        self.assertEqual(len(applied), 4)
+
+    def test_punctuation_inside_quotes_and_terminal_mark(self):
+        text, _ = apply_spoken_punctuation(
+            "quote hello comma world end quote period"
+        )
+
+        self.assertEqual(text, '"hello, world."')
+
+    def test_automatic_punctuation_beside_commands_is_collapsed(self):
+        text, _ = apply_spoken_punctuation(
+            "Hello comma, world period. Is this right question mark?"
+        )
+
+        self.assertEqual(text, "Hello, world. Is this right?")
+
+    def test_literal_punctuation_references_are_preserved(self):
+        cases = (
+            "I used the word comma in context.",
+            "Add a colon.",
+            "This was meant to end with a colon.",
+            "Say colon when discussing the command.",
+        )
+        for raw in cases:
+            with self.subTest(raw=raw):
+                text, applied = apply_spoken_punctuation(raw)
+                self.assertEqual(text, raw)
+                self.assertEqual(applied, [])
+
+    def test_unmatched_quote_is_left_for_ambiguity_cleanup(self):
+        raw = "I said quote only once."
+        text, applied = apply_spoken_punctuation(raw)
+        self.assertEqual(text, raw)
+        self.assertEqual(applied, [])
+
     def test_colon_supersedes_automatic_period(self):
         self.assertEqual(
             normalize_punctuation_collisions("He sent me this:."),

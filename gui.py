@@ -35,10 +35,12 @@ class MoneyPennyGUI:
         self.log_text = None
         self.history_text = None
         self.recent_activity = []
+        self.activation_requested = threading.Event()
 
         # Register for status updates
         self.app.add_status_callback(self._on_status_update)
         self.app.add_history_callback(self._on_history_update)
+        self.app.add_correction_suggestion_callback(self._on_correction_suggestion)
 
     def create_window(self):
         """Create the main window."""
@@ -165,6 +167,7 @@ class MoneyPennyGUI:
         self.window.attributes("-topmost", True)
         self.window.after(200, lambda: self.window.attributes("-topmost", False))
         self.window.focus_force()
+        self.window.after(100, self._poll_activation_request)
 
     def _set_window_icon(self):
         """Show the MoneyPenny image on the window title bar and taskbar.
@@ -369,18 +372,40 @@ class MoneyPennyGUI:
         cleanup_selector.pack(anchor="w", padx=5, pady=(5, 8))
 
         self.cleanup_model_var = ctk.StringVar(
-            value=self.app.settings.get("cleanup_model", "llama-3.1-8b-instant")
+            value=self.app.settings.get("cleanup_model", "openai/gpt-oss-20b")
         )
         cleanup_model_entry = ctk.CTkEntry(
             container,
             textvariable=self.cleanup_model_var,
-            placeholder_text="llama-3.1-8b-instant",
+            placeholder_text="openai/gpt-oss-20b",
             fg_color=BG_COLOR,
             border_color=BUTTON_COLOR,
             text_color=TEXT_COLOR,
             width=330,
         )
         cleanup_model_entry.pack(anchor="w", padx=5, pady=(0, 12))
+
+        self.correction_recognition_var = ctk.BooleanVar(
+            value=self.app.settings.get("correction_recognition_enabled", True)
+        )
+        correction_recognition = ctk.CTkCheckBox(
+            container,
+            text="Suggest corrections after immediate Backspace and retype",
+            variable=self.correction_recognition_var,
+            onvalue=True,
+            offvalue=False,
+            fg_color=ACCENT_COLOR,
+            text_color=TEXT_COLOR,
+        )
+        correction_recognition.pack(anchor="w", padx=5, pady=(0, 3))
+        ctk.CTkLabel(
+            container,
+            text="Watches only the same text field for 10 seconds and asks before saving.",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color="#888888",
+            wraplength=500,
+            justify="left",
+        ).pack(anchor="w", padx=5, pady=(0, 12))
 
         # --- OpenRouter API key ---
         ctk.CTkLabel(
@@ -712,7 +737,9 @@ class MoneyPennyGUI:
 
         ctk.CTkLabel(
             container,
-            text="AI cleanup interprets these from context; say the term normally when discussing it.",
+            text=(
+                "Common commands run locally; ambiguous literal references can use AI cleanup."
+            ),
             font=ctk.CTkFont(family="Segoe UI", size=11),
             text_color="#888888",
             wraplength=500,
@@ -720,7 +747,7 @@ class MoneyPennyGUI:
         ).pack(anchor="w", padx=10, pady=(0, 5))
 
         commands_text = (
-            "quote ... quote / open quote ... close quote    Wrap words in quotation marks\n"
+            "quote ... end quote / open quote ... close quote  Wrap words in quotation marks\n"
             "comma / period / question mark                  ,  .  ?\n"
             "exclamation point / colon / semicolon           !  :  ;\n"
             "new line / new paragraph                        Start a new line or paragraph\n"
@@ -913,6 +940,42 @@ class MoneyPennyGUI:
             except Exception:
                 pass
 
+    def _on_correction_suggestion(self, heard: str, written: str):
+        """Move a background recognition suggestion onto Tk's main thread."""
+        if not self.window:
+            return
+        try:
+            self.window.after(
+                0,
+                lambda heard=heard, written=written: self._confirm_correction(
+                    heard, written
+                ),
+            )
+        except Exception:
+            pass
+
+    def _confirm_correction(self, heard: str, written: str):
+        self._deiconify()
+        accepted = messagebox.askyesno(
+            "Learn Correction?",
+            f'MoneyPenny typed:\n\n"{heard}"\n\n'
+            f'You changed it to:\n\n"{written}"\n\n'
+            "Use this correction automatically in future dictation?",
+            parent=self.window,
+        )
+        if not accepted:
+            self._log_activity(f"Correction suggestion declined: {heard} → {written}")
+            return
+        if self.app.accept_correction_suggestion(heard, written):
+            self._refresh_correction_list()
+            self._log_activity(f"Learned correction: {heard} → {written}")
+        else:
+            messagebox.showinfo(
+                "MoneyPenny",
+                "A correction for that heard phrase already exists.",
+                parent=self.window,
+            )
+
     def _refresh_history_display(self):
         """Render newest captured transcripts first."""
         if not self.history_text:
@@ -985,7 +1048,11 @@ class MoneyPennyGUI:
         )
         self.app.settings.set(
             "cleanup_model",
-            self.cleanup_model_var.get().strip() or "llama-3.1-8b-instant",
+            self.cleanup_model_var.get().strip() or "openai/gpt-oss-20b",
+        )
+        self.app.settings.set(
+            "correction_recognition_enabled",
+            bool(self.correction_recognition_var.get()),
         )
 
         # Local model
@@ -1112,11 +1179,29 @@ class MoneyPennyGUI:
                 pass
         self.create_window()
 
+    def request_activation(self):
+        """Queue a restore request from the single-instance listener thread."""
+        self.activation_requested.set()
+
+    def _poll_activation_request(self):
+        """Process queued restore requests on Tk's main thread."""
+        if not self.window:
+            return
+        if self.activation_requested.is_set():
+            self.activation_requested.clear()
+            self._deiconify()
+        try:
+            self.window.after(100, self._poll_activation_request)
+        except Exception:
+            pass
+
     def _deiconify(self):
         """Restore the window (must run on the main thread)."""
         try:
             self.window.deiconify()
             self.window.lift()
+            self.window.attributes("-topmost", True)
+            self.window.after(150, lambda: self.window.attributes("-topmost", False))
             self.window.focus_force()
         except Exception:
             pass
