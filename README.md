@@ -7,11 +7,13 @@
 - **Hold‑to‑record**: Press and hold RIGHT CTRL, release to transcribe
 - **Types into any app**: Output is typed into the focused window
 - **Cloud or local transcription**: Cloud mode (Groq or OpenRouter) is fast and accurate; Local mode (faster-whisper) works offline. Choose in the Settings tab.
-- **Selective context-aware cleanup**: Normal dictation stays on the fast single-request path; a Groq language-model pass runs only when verbal punctuation is detected and preserves literal phrases such as "the word comma"
+- **Reliable spoken punctuation**: Common commands and paired quotations run locally; ambiguous literal phrases such as "the word comma" can still use selective AI cleanup
 - **Settings window + system tray**: A GUI with Settings, Dictionary, History, and Status tabs. Closing the window hides it to the tray so it keeps listening.
-- **Custom dictionary**: Add names, jargon, and uncommon words (Dictionary tab or `lexicon.txt`) to improve recognition
+- **Single-instance window restore**: Launching MoneyPenny again restores and focuses the existing window instead of opening a duplicate or an informational dialog.
+- **Preferred vocabulary and exact corrections**: Bias uncommon terminology, or guarantee local replacements such as `Whisper Flow` → `Wispr Flow` and `C sharp` → `C#`
+- **Correction recognition**: Immediately Backspace and retype the end of a new transcript; MoneyPenny asks whether to learn the change as an exact correction
 - **Captured transcript history**: Review raw and cleaned transcripts locally in the History tab
-- **Spoken punctuation**: Say commands such as `comma`, `question mark`, `new line` (line break; works in every app, never sends — say twice for a blank line), or `quote ... quote` (closing may be `quote`, `close quote`, or `end quote`); see the reference in the Dictionary tab
+- **Spoken punctuation**: Say commands such as `comma`, `question mark`, `new line` (a safe Shift+Enter break; say it twice for a blank line), or `quote ... end quote`; see the reference in the Dictionary tab
 - **Quick exit**: Press Ctrl+Alt+Q, or right-click the tray icon → Exit
 
 ## 🚀 Quick Start
@@ -45,8 +47,8 @@ This route needs only Windows 10/11 and a microphone—Python is already include
    - Place the cursor in any text field
    - Hold RIGHT CTRL to dictate
    - Release to transcribe; text will be typed automatically
-   - For quoted text, say `quote this is quoted quote` (or `open quote this is quoted end quote`); MoneyPenny types `"this is quoted"`
-   - For a line break, say `new line` (or `new paragraph` — both are the same safe break that never sends a message); say it twice for a blank line
+   - For quoted text, say `quote this is quoted quote` or `open quote this is quoted end quote`; MoneyPenny types `"this is quoted"`
+   - For a line break, say `new line`, `newline`, or `new paragraph`; all use safe Shift+Enter and never submit a chat message. Say the command twice for a blank line.
    - When discussing punctuation itself, use natural context such as `the word comma` or `a comma`
    - Note: closing the window does NOT quit the app — it hides to the tray. To quit: Ctrl+Alt+Q or right-click the tray icon → Exit
 
@@ -65,7 +67,8 @@ All settings live in the app's **Settings tab** (double‑click the tray icon to
 
 - **Transcription Mode**: Cloud (fast, needs internet + API key) or Local (offline, slower)
 - **Cloud Provider**: Groq (usually fastest) or OpenRouter, with separate API key and model fields for each
-- **AI Transcript Cleanup**: `Commands only` (default) invokes `llama-3.1-8b-instant` only for likely verbal punctuation; `Off` never invokes it and `Always` cleans every transcript
+- **AI Transcript Cleanup**: Local commands do not need AI. `Commands only` (default) invokes `openai/gpt-oss-20b` only for remaining likely verbal punctuation; `Off` never invokes it and `Always` cleans every transcript
+- **Correction Recognition**: Enabled by default for this trial. It watches only the same focused text control for 10 seconds after dictation and asks before saving any rule. Disable it independently in Settings.
 - **Local Model**: `tiny.en` (fastest) or `base.en` (more accurate) — used in Local mode
 - **Microphone**: System default or a specific device
 - **Record Hotkey**: RIGHT CTRL by default; several alternatives available (a change takes effect after restarting the app)
@@ -78,6 +81,10 @@ Acme Corporation
 # project
 Project Skylark
 ```
+
+Preferred vocabulary is a soft hint to the transcription model. For guaranteed spelling, add an **Exact Correction** in the same tab: enter what transcription usually produces under **Heard as**, and the required output under **Type as**. Exact corrections run locally and are stored privately in `corrections.json`.
+
+To teach an immediate correction, use Backspace at the end of a freshly typed transcript and retype the corrected ending without clicking elsewhere or moving the caret. Pause for about one second; MoneyPenny shows the proposed heard-as → type-as rule and saves it only if you confirm.
 
 Captured transcripts are stored locally in `transcript_history.jsonl`, shown in the **History** tab, and excluded from Git.
 
@@ -95,12 +102,13 @@ MoneyPenny/
 ├── MoneyPenny Voice Typing.bat # Windows launcher (recommended)
 ├── MoneyPenny Headless.bat     # Launcher without settings window/tray
 ├── lexicon.example.txt         # Safe starter for the private dictionary
+├── corrections.example.json   # Example deterministic spelling corrections
 ├── CHANGELOG.md                # Version history
 ├── QuickStart-CheatSheet.md    # One-page usage reference
 ├── ROADMAP.md                  # Product and installation direction
 ├── DECISIONS.md                # Significant decisions and their reasons
-├── LESSONS_LEARNED.md          # Reusable lessons, newest first
-├── SESSION_CLOSEOUT.md         # End-of-day closeout checklist
+├── LESSONS_LEARNED.md          # Reusable engineering lessons
+├── SESSION_CLOSEOUT.md         # End-of-day release checklist
 └── README.md                   # This file
 ```
 
@@ -185,7 +193,8 @@ These steps avoid any coding or commands. You’ll click and open files like any
    - The launcher opens MoneyPenny without a black console window after setup is complete
 
 7) Add uncommon words (optional)
-   - Open the app's Dictionary tab, type a word, click Add
+   - Open the app's Dictionary tab and add a preferred word as a soft recognition hint
+   - For guaranteed spelling, add an Exact Correction with **Heard as** and **Type as**
    - (Or edit `lexicon.txt` in the “MoneyPenny” folder — one word or phrase per line — then restart the app)
 
 ### Copy‑and‑paste prompts for an AI helper (optional)

@@ -26,7 +26,7 @@ When the user says something like **"let's close out the session for the day"** 
 
 ## 4. Safety
 
-- [ ] `git ls-files` contains no secrets or personal data. `settings.json`, `lexicon.txt`, `transcript_history.jsonl`, and `encryption.key` must remain untracked.
+- [ ] `git ls-files` contains no secrets or personal data. `settings.json`, `lexicon.txt`, `corrections.json`, `transcript_history.jsonl`, and `encryption.key` must remain untracked.
 
 ## 5. Commit and publish
 

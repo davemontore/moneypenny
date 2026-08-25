@@ -1,18 +1,24 @@
 # Voice Typing App - Changelog
 
-## Version 3.1.1 - Dictation Reliability Fixes
-*Released: August 2026*
+## Version 3.1.1 - Correction Pipeline
+*Released: August 25, 2026*
 
-### 🔧 Technical Fixes
-- **Overlapping dictations no longer double-type**: transcribe-and-type runs are serialized, so a slow or stalled cloud request can no longer cause a later transcript to be pasted twice or out of order
-- **Cloud transcription retries once** on provider 5xx errors (e.g. Groq HTTP 522) and dropped connections before reporting failure
-- **Microphone stays warm with a half-second pre-roll**, so very quick hotkey presses capture audio instead of producing "No audio recorded"
-- **Cleanup understands line-break commands and quote punctuation**: `new line` / `new paragraph` now emit real line breaks, and commas/periods are placed inside closing quotation marks
-- **One universal line break — no app-specific behavior to remember**: `new line` and `new paragraph` both type Shift+Enter, which works in every app and never sends a chat message; say it twice for a blank line
-- **Quote commands accept synonyms**: `end quote` now works anywhere `close quote` does
-
-### 🧪 Development Notes
-- Added regression tests for the cleanup prompt's line-break and quote-punctuation guidance and for the cloud retry behavior
+### Current Changes
+- Added opt-out correction recognition: immediate Backspace-and-retype edits within 10 seconds produce a confirm-before-save exact-correction suggestion
+- Correction recognition is limited to the same focused control, cancels on mouse/navigation/window changes, skips detectable secure fields, and never suppresses user input
+- Fixed verbal punctuation failures caused by Groq's retirement of `llama-3.1-8b-instant`; existing settings migrate to `openai/gpt-oss-20b`
+- Added dependency-free local parsing for paired quotes (`quote ... end quote` included), common punctuation, line breaks, parentheses, and slashes
+- Protected explicit literal forms such as `the word comma`, `a colon`, and `say colon` from local command replacement
+- Clicking a MoneyPenny shortcut while the app is already running now restores and focuses the existing GUI instead of showing an "already running" dialog
+- Split the Dictionary into soft preferred-vocabulary hints and deterministic exact corrections
+- Added local heard-as → type-as rules with whole-phrase matching, longest-match priority, and exact output casing/symbols
+- Added narrow local repair for impossible punctuation collisions such as `:.` and `,?`
+- Serialized complete dictations so stalled cloud requests cannot double-type or reorder later transcripts
+- Cloud transcription retries transient 5xx responses and dropped connections once before reporting failure
+- Kept the microphone warm with a short pre-roll so quick hotkey presses retain their opening audio
+- Made `new line`, `newline`, and `new paragraph` the same safe Shift+Enter break; say one twice for a blank line
+- Normalized commas and periods inside closing quotation marks without relying on the cleanup model
+- Added regression coverage and a durable multi-session upgrade plan
 
 ---
 

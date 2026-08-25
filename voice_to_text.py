@@ -20,6 +20,7 @@ import atexit
 import json
 from collections import deque
 import socket
+import re
 from datetime import datetime
 
 
@@ -59,7 +60,11 @@ LOG_DIR = APP_DIR / "logs"
 LOG_FILE = LOG_DIR / "moneypenny.log"
 SETTINGS_FILE = APP_DIR / "settings.json"
 LEXICON_FILE = APP_DIR / "lexicon.txt"
+CORRECTIONS_FILE = APP_DIR / "corrections.json"
 HISTORY_FILE = APP_DIR / "transcript_history.jsonl"
+SINGLE_INSTANCE_MUTEX_NAME = "Global\\MoneyPennyVoiceTypingMutex"
+ACTIVATE_WINDOW_EVENT_NAME = "Global\\MoneyPennyActivateWindowEvent"
+MAIN_WINDOW_TITLE = "MoneyPenny Voice Typing"
 
 
 def configure_logging() -> logging.Logger:
@@ -117,8 +122,20 @@ def _acquire_single_instance_lock():
     """
     try:
         import ctypes
+        from ctypes import wintypes
+
         kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        mutex = kernel32.CreateMutexW(None, False, "Global\\MoneyPennyVoiceTypingMutex")
+        kernel32.CreateMutexW.argtypes = [
+            ctypes.c_void_p,
+            wintypes.BOOL,
+            wintypes.LPCWSTR,
+        ]
+        kernel32.CreateMutexW.restype = wintypes.HANDLE
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+
+        ctypes.set_last_error(0)
+        mutex = kernel32.CreateMutexW(None, False, SINGLE_INSTANCE_MUTEX_NAME)
         ERROR_ALREADY_EXISTS = 183
         if not mutex or ctypes.get_last_error() == ERROR_ALREADY_EXISTS:
             # Another copy owns the lock. IMPORTANT: CreateMutexW opened a
@@ -136,29 +153,112 @@ def _acquire_single_instance_lock():
         return True
 
 
-def _notify_already_running():
-    """Tell the user MoneyPenny is already running, then exit."""
+def _create_activation_event():
+    """Create the signal that asks the primary instance to show its GUI."""
     try:
-        import tkinter as tk
-        from tkinter import messagebox
-        root = tk.Tk()
-        root.withdraw()
-        messagebox.showinfo(
-            "MoneyPenny",
-            "MoneyPenny is already running — no need to open it again.\n\n"
-            "Note: closing the MoneyPenny window does NOT quit the app.\n"
-            "It hides to the system tray so it can keep listening for your "
-            "hotkey. Look for its icon near the clock (you may need to click "
-            "the small ^ arrow to see it).\n\n"
-            "To fully quit: right-click the tray icon and choose Exit, "
-            "or press Ctrl+Alt+Q.",
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateEventW.argtypes = [
+            ctypes.c_void_p,
+            wintypes.BOOL,
+            wintypes.BOOL,
+            wintypes.LPCWSTR,
+        ]
+        kernel32.CreateEventW.restype = wintypes.HANDLE
+        event_handle = kernel32.CreateEventW(
+            None, False, False, ACTIVATE_WINDOW_EVENT_NAME
         )
-        root.destroy()
+        if not event_handle:
+            raise ctypes.WinError(ctypes.get_last_error())
+        return event_handle
     except Exception:
-        logger.warning("MoneyPenny is already running; second instance exiting.")
+        logger.exception("Could not create the window activation event")
+        return None
+
+
+def _signal_existing_instance():
+    """Ask the running instance to restore its GUI, without showing a dialog."""
+    signaled = False
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.OpenEventW.argtypes = [
+            wintypes.DWORD,
+            wintypes.BOOL,
+            wintypes.LPCWSTR,
+        ]
+        kernel32.OpenEventW.restype = wintypes.HANDLE
+        kernel32.SetEvent.argtypes = [wintypes.HANDLE]
+        kernel32.SetEvent.restype = wintypes.BOOL
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+
+        EVENT_MODIFY_STATE = 0x0002
+        event_handle = kernel32.OpenEventW(
+            EVENT_MODIFY_STATE, False, ACTIVATE_WINDOW_EVENT_NAME
+        )
+        if event_handle:
+            signaled = bool(kernel32.SetEvent(event_handle))
+            kernel32.CloseHandle(event_handle)
+    except Exception:
+        logger.exception("Could not signal the running MoneyPenny instance")
+
+    # The newly launched process owns Windows' foreground permission, so it
+    # performs the final focus request after the primary process restores the
+    # Tk window in response to the event above.
+    focused = _focus_existing_window()
+    logger.info(
+        "MoneyPenny is already running; activation signaled=%s focused=%s",
+        signaled,
+        focused,
+    )
+
+
+def _focus_existing_window(timeout_seconds=1.5):
+    """Bring the existing GUI forward from the user-launched second process."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        user32.FindWindowW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]
+        user32.FindWindowW.restype = wintypes.HWND
+        user32.IsIconic.argtypes = [wintypes.HWND]
+        user32.IsIconic.restype = wintypes.BOOL
+        user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+        user32.ShowWindow.restype = wintypes.BOOL
+        user32.BringWindowToTop.argtypes = [wintypes.HWND]
+        user32.BringWindowToTop.restype = wintypes.BOOL
+        user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+        user32.SetForegroundWindow.restype = wintypes.BOOL
+
+        SW_SHOW = 5
+        SW_RESTORE = 9
+        deadline = time.monotonic() + timeout_seconds
+        while True:
+            window_handle = user32.FindWindowW(None, MAIN_WINDOW_TITLE)
+            if window_handle:
+                show_command = (
+                    SW_RESTORE if user32.IsIconic(window_handle) else SW_SHOW
+                )
+                user32.ShowWindow(window_handle, show_command)
+                user32.BringWindowToTop(window_handle)
+                user32.SetForegroundWindow(window_handle)
+                return True
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(0.05)
+    except Exception:
+        logger.exception("Could not bring the running MoneyPenny window forward")
+        return False
 
 
 # --- Configuration ---
+APP_VERSION = "3.1.1"
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
 RATE = 16000
@@ -175,7 +275,8 @@ DEFAULT_SETTINGS = {
     "groq_api_key": "",
     "groq_model": "whisper-large-v3-turbo",
     "cleanup_mode": "commands",  # "off", "commands", or "always"
-    "cleanup_model": "llama-3.1-8b-instant",
+    "cleanup_model": "openai/gpt-oss-20b",
+    "correction_recognition_enabled": True,
     "record_hotkey": "right ctrl",
     "selected_microphone": None,  # None = system default
 }
@@ -189,6 +290,7 @@ class Settings:
         self.load()
 
     def load(self):
+        migrated = False
         try:
             if SETTINGS_FILE.exists():
                 with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
@@ -203,7 +305,20 @@ class Settings:
                 for key in DEFAULT_SETTINGS:
                     if key in saved:
                         self.settings[key] = saved[key]
+
+                # Groq retired llama-3.1-8b-instant on 2026-08-16. Existing
+                # installations keep their saved model forever unless we
+                # migrate it, which made every punctuation cleanup silently
+                # fall back to the raw transcript.
+                if self.settings.get("cleanup_model") == "llama-3.1-8b-instant":
+                    self.settings["cleanup_model"] = "openai/gpt-oss-20b"
+                    migrated = True
+                    logger.info(
+                        "Migrated retired cleanup model to openai/gpt-oss-20b"
+                    )
                 logger.info("Settings loaded from %s", SETTINGS_FILE)
+                if migrated:
+                    self.save()
         except Exception:
             logger.exception("Failed to load settings, using defaults")
 
@@ -282,6 +397,541 @@ class Lexicon:
         return prompt[:600]
 
 
+class ExactCorrections:
+    """Persistent, deterministic heard-as -> type-as correction rules."""
+
+    def __init__(self, path: Path = CORRECTIONS_FILE):
+        self.path = path
+        self.rules = []
+        self._pattern = None
+        self._by_heard = {}
+        self.load()
+
+    def load(self):
+        self.rules = []
+        if not self.path.exists():
+            return
+        try:
+            with open(self.path, "r", encoding="utf-8") as corrections_file:
+                saved = json.load(corrections_file)
+
+            # Accept both the documented list format and a simple object map so
+            # hand-edited files are forgiving.
+            if isinstance(saved, dict):
+                saved = [
+                    {"heard": heard, "written": written}
+                    for heard, written in saved.items()
+                ]
+
+            for rule in saved if isinstance(saved, list) else []:
+                if not isinstance(rule, dict):
+                    continue
+                heard = str(rule.get("heard", "")).strip()
+                written = str(rule.get("written", "")).strip()
+                if heard and written and not self._contains_heard(heard):
+                    self.rules.append({"heard": heard, "written": written})
+            self._rebuild_matcher()
+            logger.info("Exact corrections loaded: %d rules", len(self.rules))
+        except Exception:
+            logger.exception("Failed to load exact corrections")
+
+    def save(self):
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            temporary_path = self.path.with_suffix(self.path.suffix + ".tmp")
+            with open(temporary_path, "w", encoding="utf-8") as corrections_file:
+                json.dump(self.rules, corrections_file, indent=2, ensure_ascii=False)
+                corrections_file.write("\n")
+            temporary_path.replace(self.path)
+            logger.info("Exact corrections saved: %d rules", len(self.rules))
+        except Exception:
+            logger.exception("Failed to save exact corrections")
+
+    def _contains_heard(self, heard: str) -> bool:
+        target = heard.casefold()
+        return any(rule["heard"].casefold() == target for rule in self.rules)
+
+    def _rebuild_matcher(self):
+        """Compile rules once so applying them adds minimal dictation latency."""
+        self._by_heard = {
+            rule["heard"].casefold(): rule
+            for rule in self.rules
+        }
+        alternatives = sorted(
+            (re.escape(rule["heard"]) for rule in self.rules),
+            key=len,
+            reverse=True,
+        )
+        self._pattern = (
+            re.compile(
+                r"(?<!\w)(?:" + "|".join(alternatives) + r")(?!\w)",
+                re.IGNORECASE,
+            )
+            if alternatives
+            else None
+        )
+
+    def add(self, heard: str, written: str) -> bool:
+        heard = heard.strip()
+        written = written.strip()
+        if not heard or not written or self._contains_heard(heard):
+            return False
+        self.rules.append({"heard": heard, "written": written})
+        self._rebuild_matcher()
+        self.save()
+        return True
+
+    def remove(self, heard: str) -> bool:
+        target = heard.casefold()
+        for index, rule in enumerate(self.rules):
+            if rule["heard"].casefold() == target:
+                del self.rules[index]
+                self._rebuild_matcher()
+                self.save()
+                return True
+        return False
+
+    def apply(self, text: str) -> tuple[str, list]:
+        """Apply all matching rules once, longest first, without cascades."""
+        if not text or self._pattern is None:
+            return text, []
+        applied = []
+
+        def replace_match(match):
+            rule = self._by_heard[match.group(0).casefold()]
+            applied.append({
+                "heard": match.group(0),
+                "written": rule["written"],
+            })
+            return rule["written"]
+
+        return self._pattern.sub(replace_match, text), applied
+
+
+class CorrectionTracker:
+    """Track a short, direct Backspace-and-retype correction at the caret."""
+
+    WINDOW_SECONDS = 10.0
+    IDLE_SECONDS = 1.0
+    MAX_BACKSPACES = 100
+    MAX_REPLACEMENT_CHARS = 120
+    MAX_RULE_CHARS = 80
+    MAX_RULE_WORDS = 5
+
+    _IGNORED_MODIFIERS = {
+        "shift", "left shift", "right shift", "caps lock",
+    }
+    _CANCEL_KEYS = {
+        "delete", "insert", "home", "end", "page up", "page down",
+        "up", "down", "left", "right", "tab", "enter", "esc", "escape",
+        "ctrl", "left ctrl", "right ctrl", "alt", "left alt", "right alt",
+        "windows", "left windows", "right windows", "cmd",
+    }
+    _SHIFTED_CHARACTERS = {
+        "1": "!", "2": "@", "3": "#", "4": "$", "5": "%",
+        "6": "^", "7": "&", "8": "*", "9": "(", "0": ")",
+        "-": "_", "=": "+", "[": "{", "]": "}", "\\": "|",
+        ";": ":", "'": '"', ",": "<", ".": ">", "/": "?",
+        "`": "~",
+    }
+
+    def __init__(self, clock=time.monotonic):
+        self.clock = clock
+        self.lock = threading.RLock()
+        self._reset()
+
+    def _reset(self):
+        self.original_text = ""
+        self.context = None
+        self.deadline = 0.0
+        self.last_input_at = None
+        self.backspaces = 0
+        self.replacement = ""
+
+    @property
+    def active(self) -> bool:
+        with self.lock:
+            return bool(self.original_text)
+
+    def arm(self, text: str, context, now=None) -> bool:
+        """Begin watching only after MoneyPenny finishes injecting text."""
+        with self.lock:
+            self._reset()
+            if not text or context is None:
+                return False
+            current = self.clock() if now is None else now
+            self.original_text = text
+            self.context = context
+            self.deadline = current + self.WINDOW_SECONDS
+            return True
+
+    def cancel(self):
+        with self.lock:
+            self._reset()
+
+    def handle_key(
+        self,
+        name: str,
+        context,
+        *,
+        shift=False,
+        caps_lock=False,
+        ctrl=False,
+        alt=False,
+        now=None,
+    ):
+        """Consume one physical key-down event without suppressing it."""
+        with self.lock:
+            if not self.original_text:
+                return
+            current = self.clock() if now is None else now
+            if current > self.deadline or context != self.context:
+                self._reset()
+                return
+
+            key = (name or "").casefold()
+            if key in self._IGNORED_MODIFIERS:
+                return
+            if ctrl or alt or key in self._CANCEL_KEYS or key.startswith("f") and key[1:].isdigit():
+                self._reset()
+                return
+
+            if key == "backspace":
+                if self.replacement:
+                    self.replacement = self.replacement[:-1]
+                elif self.backspaces < min(len(self.original_text), self.MAX_BACKSPACES):
+                    self.backspaces += 1
+                else:
+                    self._reset()
+                    return
+                self.last_input_at = current
+                return
+
+            character = self._key_to_character(key, shift, caps_lock)
+            if character is None or not self.backspaces:
+                self._reset()
+                return
+            self.replacement += character
+            self.last_input_at = current
+            if len(self.replacement) > self.MAX_REPLACEMENT_CHARS:
+                self._reset()
+
+    def poll(self, context, now=None):
+        """Return a completed (heard, written) suggestion after typing idles."""
+        with self.lock:
+            if not self.original_text:
+                return None
+            current = self.clock() if now is None else now
+            if context != self.context:
+                self._reset()
+                return None
+            expired = current >= self.deadline
+            idle = (
+                self.last_input_at is not None
+                and current - self.last_input_at >= self.IDLE_SECONDS
+            )
+            if not expired and not (idle and self.replacement):
+                return None
+
+            corrected = (
+                self.original_text[:-self.backspaces]
+                if self.backspaces
+                else self.original_text
+            ) + self.replacement
+            original = self.original_text
+            self._reset()
+            return self._derive_rule(original, corrected)
+
+    @classmethod
+    def _derive_rule(cls, original: str, corrected: str):
+        """Expand a character diff to safe whole-word correction boundaries."""
+        if not original or original == corrected:
+            return None
+
+        prefix = 0
+        prefix_limit = min(len(original), len(corrected))
+        while prefix < prefix_limit and original[prefix] == corrected[prefix]:
+            prefix += 1
+
+        suffix = 0
+        suffix_limit = min(len(original) - prefix, len(corrected) - prefix)
+        while (
+            suffix < suffix_limit
+            and original[len(original) - suffix - 1]
+            == corrected[len(corrected) - suffix - 1]
+        ):
+            suffix += 1
+
+        old_end = len(original) - suffix
+        new_end = len(corrected) - suffix
+
+        def word_character(character):
+            return character.isalnum() or character in "_'-"
+
+        while prefix > 0 and (
+            word_character(original[prefix - 1])
+            or word_character(corrected[prefix - 1])
+        ):
+            prefix -= 1
+        while old_end < len(original) and word_character(original[old_end]):
+            old_end += 1
+        while new_end < len(corrected) and word_character(corrected[new_end]):
+            new_end += 1
+
+        trim = " \t\r\n.,!?;:\"()[]{}"
+        heard = original[prefix:old_end].strip(trim)
+        written = corrected[prefix:new_end].strip(trim)
+        if not heard or not written or heard == written:
+            return None
+        if not any(character.isalnum() for character in heard):
+            return None
+        if not any(character.isalnum() for character in written):
+            return None
+        if len(heard) > cls.MAX_RULE_CHARS or len(written) > cls.MAX_RULE_CHARS:
+            return None
+        if len(heard.split()) > cls.MAX_RULE_WORDS or len(written.split()) > cls.MAX_RULE_WORDS:
+            return None
+        return heard, written
+
+    @classmethod
+    def _key_to_character(cls, key: str, shift: bool, caps_lock: bool):
+        if key == "space":
+            return " "
+        if len(key) != 1:
+            return None
+        if key.isalpha():
+            return key.upper() if shift ^ caps_lock else key.lower()
+        if shift:
+            return cls._SHIFTED_CHARACTERS.get(key, key)
+        return key
+
+
+def _get_keyboard_focus_context():
+    """Return ((foreground window, focused control), is_secure_field)."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class GUITHREADINFO(ctypes.Structure):
+            _fields_ = [
+                ("cbSize", wintypes.DWORD),
+                ("flags", wintypes.DWORD),
+                ("hwndActive", wintypes.HWND),
+                ("hwndFocus", wintypes.HWND),
+                ("hwndCapture", wintypes.HWND),
+                ("hwndMenuOwner", wintypes.HWND),
+                ("hwndMoveSize", wintypes.HWND),
+                ("hwndCaret", wintypes.HWND),
+                ("rcCaret", wintypes.RECT),
+            ]
+
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        user32.GetForegroundWindow.restype = wintypes.HWND
+        foreground = user32.GetForegroundWindow()
+        if not foreground:
+            return None, False
+
+        user32.GetWindowThreadProcessId.argtypes = [
+            wintypes.HWND,
+            ctypes.POINTER(wintypes.DWORD),
+        ]
+        user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+        thread_id = user32.GetWindowThreadProcessId(foreground, None)
+        info = GUITHREADINFO(cbSize=ctypes.sizeof(GUITHREADINFO))
+        user32.GetGUIThreadInfo.argtypes = [
+            wintypes.DWORD,
+            ctypes.POINTER(GUITHREADINFO),
+        ]
+        user32.GetGUIThreadInfo.restype = wintypes.BOOL
+        focused = foreground
+        if user32.GetGUIThreadInfo(thread_id, ctypes.byref(info)) and info.hwndFocus:
+            focused = info.hwndFocus
+
+        # Standard Win32 Edit controls expose a non-zero password character.
+        # Browser and custom controls may not, so recognition remains opt-out.
+        class_name = ctypes.create_unicode_buffer(128)
+        user32.GetClassNameW.argtypes = [
+            wintypes.HWND,
+            wintypes.LPWSTR,
+            ctypes.c_int,
+        ]
+        user32.GetClassNameW.restype = ctypes.c_int
+        user32.GetClassNameW(focused, class_name, len(class_name))
+        is_secure = False
+        if class_name.value.casefold() == "edit":
+            EM_GETPASSWORDCHAR = 0x00D2
+            user32.SendMessageW.restype = wintypes.LPARAM
+            is_secure = bool(
+                user32.SendMessageW(focused, EM_GETPASSWORDCHAR, 0, 0)
+            )
+
+        return (int(foreground), int(focused)), is_secure
+    except Exception:
+        logger.exception(
+            "Could not inspect the focused control for correction recognition"
+        )
+        return None, False
+
+
+def _mouse_button_is_pressed() -> bool:
+    try:
+        import ctypes
+
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        user32.GetAsyncKeyState.argtypes = [ctypes.c_int]
+        user32.GetAsyncKeyState.restype = ctypes.c_short
+        return any(
+            user32.GetAsyncKeyState(vk) & 0x8000 for vk in (0x01, 0x02, 0x04)
+        )
+    except Exception:
+        return False
+
+
+def _caps_lock_is_on() -> bool:
+    try:
+        import ctypes
+
+        return bool(ctypes.WinDLL("user32").GetKeyState(0x14) & 1)
+    except Exception:
+        return False
+
+
+def normalize_punctuation_collisions(text: str) -> str:
+    """Resolve impossible punctuation collisions without rewriting language."""
+    if not text:
+        return text
+
+    # A colon or semicolon spoken at the end of a sentence supersedes the
+    # automatic punctuation supplied by the speech model (":." -> ":").
+    text = re.sub(r"([:;])[.,](?=\s|$|[\"”’\)\]])", r"\1", text)
+    # Terminal punctuation supersedes a comma inserted beside it (",." -> ".").
+    text = re.sub(r",([!?])", r"\1", text)
+    text = re.sub(r",\.(?!\.)", ".", text)
+    return text
+
+
+_QUOTE_EXPLICIT_PATTERN = re.compile(
+    r"(?<!\w)(?:open\s+quote|quote)(?!\w)[,:]?\s+"
+    r"(?P<content>.+?)\s+(?:end\s+quote|close\s+quote)(?!\w)",
+    re.IGNORECASE,
+)
+_QUOTE_PAIRED_PATTERN = re.compile(
+    r"(?<!\w)quote(?!\w)[,:]?\s+(?P<content>.+?)\s+quote(?!\w)",
+    re.IGNORECASE,
+)
+
+_SPOKEN_COMMANDS = {
+    # Both commands are soft breaks. Saying either command twice creates a
+    # blank line without ever sending a chat-style text box.
+    "new paragraph": "\n",
+    "new line": "\n",
+    "newline": "\n",
+    "open parenthesis": "(",
+    "open parentheses": "(",
+    "close parenthesis": ")",
+    "close parentheses": ")",
+    "question mark": "?",
+    "exclamation point": "!",
+    "exclamation mark": "!",
+    "full stop": ".",
+    "backslash": "\\",
+    "semicolon": ";",
+    "comma": ",",
+    "period": ".",
+    "colon": ":",
+    "slash": "/",
+}
+_SPOKEN_COMMAND_PATTERN = re.compile(
+    r"(?<!\w)(?:"
+    + "|".join(
+        sorted(
+            (re.escape(command) for command in _SPOKEN_COMMANDS),
+            key=len,
+            reverse=True,
+        )
+    )
+    + r")(?!\w)",
+    re.IGNORECASE,
+)
+_LITERAL_PRECEDING_WORDS = {
+    "a", "an", "the", "word", "term", "phrase", "command", "symbol",
+    "say", "saying", "said", "called", "named", "spell", "spelled",
+    "type", "typed", "write", "written", "use", "using", "mention",
+}
+_LITERAL_FOLLOWING_WORDS = {
+    "word", "term", "phrase", "command", "symbol", "punctuation",
+}
+
+
+def _is_literal_punctuation_reference(text: str, start: int, end: int) -> bool:
+    """Recognize explicit discussion of a punctuation word, not a command."""
+    preceding_words = re.findall(r"[A-Za-z']+", text[:start].casefold())
+    following_words = re.findall(r"[A-Za-z']+", text[end:].casefold())
+    previous = preceding_words[-1] if preceding_words else ""
+    following = following_words[0] if following_words else ""
+    if previous in _LITERAL_PRECEDING_WORDS:
+        return True
+    if following in _LITERAL_FOLLOWING_WORDS:
+        return True
+    return False
+
+
+def _normalize_spoken_command_spacing(text: str) -> str:
+    """Normalize only the spacing forms introduced by verbal commands."""
+    text = re.sub(r"[ \t]+([,.;:!?])", r"\1", text)
+    # Whisper may supply punctuation beside the still-verbal command. Once
+    # the command becomes a symbol, collapse only those impossible doubles.
+    text = re.sub(r"([,;:!?])\1+", r"\1", text)
+    text = re.sub(r"(?<!\.)\.\.(?!\.)", ".", text)
+    text = re.sub(r"([!?])[.,]", r"\1", text)
+    text = re.sub(r"([,;:!?])(?=[A-Za-z0-9])", r"\1 ", text)
+    text = re.sub(r"(?<!\.)\.(?=[A-Za-z])", ". ", text)
+    text = re.sub(r"\(\s+", "(", text)
+    text = re.sub(r"\s+\)", ")", text)
+    text = re.sub(r"[ \t]*([/\\])[ \t]*", r"\1", text)
+    text = re.sub(r"[ \t]*\n[ \t]*", "\n", text)
+    # A terminal command spoken after a closing quote belongs inside it.
+    text = re.sub(r'"([,.!?])', r'\1"', text)
+    return text.strip()
+
+
+def apply_spoken_punctuation(text: str) -> tuple[str, list]:
+    """Apply common verbal punctuation locally, without an API dependency.
+
+    Paired quote forms are deterministic. Single punctuation words are kept
+    literal after explicit cues such as "the word", "a", "say", or "use";
+    genuinely ambiguous prose can still be handled by the optional AI pass.
+    """
+    if not text:
+        return text, []
+
+    applied = []
+
+    def replace_quote(match):
+        content = match.group("content").strip()
+        if not content:
+            return match.group(0)
+        applied.append({"command": "quote pair", "written": f'"{content}"'})
+        return f'"{content}"'
+
+    text = _QUOTE_EXPLICIT_PATTERN.sub(replace_quote, text)
+    text = _QUOTE_PAIRED_PATTERN.sub(replace_quote, text)
+
+    def replace_command(match):
+        if _is_literal_punctuation_reference(text, match.start(), match.end()):
+            return match.group(0)
+        command = " ".join(match.group(0).casefold().split())
+        written = _SPOKEN_COMMANDS[command]
+        applied.append({"command": match.group(0), "written": written})
+        return written
+
+    text = _SPOKEN_COMMAND_PATTERN.sub(replace_command, text)
+    if applied:
+        text = _normalize_spoken_command_spacing(text)
+        text = normalize_punctuation_collisions(text)
+    return text, applied
+
+
 class TranscriptHistory:
     """Persistent local history of raw and cleaned dictation results."""
 
@@ -358,8 +1008,8 @@ Interpret spoken punctuation from context:
 - Convert punctuation words only when the speaker uses them as commands.
 - Preserve them as words when the speaker discusses them, such as "the word comma", "a comma", or "punctuation command comma".
 - Paired "quote ... quote", "open quote ... close quote", and "open quote ... end quote" create quotation marks around only the intended words. "end quote" means exactly the same as "close quote". Leave no space between a quotation mark and the words it wraps.
-- "new line" and "new paragraph" used as commands insert a line break: emit exactly one newline character at that position. Never type the words "new line" or "new paragraph" when they are commands.
-- Commas and periods always go inside a closing quotation mark: write "hello," and "hello." — never "hello", or "hello".
+- "new line" and "new paragraph" used as commands insert exactly one newline character. Saying either command twice creates a blank line.
+- Commas and periods go inside a closing quotation mark: write "hello," and "hello." — never "hello", or "hello".
 - Resolve punctuation that speech recognition inserted beside a spoken command; never emit collisions such as `,:,`, doubled punctuation, or `\",.`.
 - Commands include comma, period, question mark, exclamation point, colon, semicolon, new line, new paragraph, open/close parenthesis, slash, backslash, and quote.
 
@@ -373,9 +1023,6 @@ CLEAN: Well, that works so far, the punctuation settings.
 RAW: that finishes the list new line next topic
 CLEAN: That finishes the list
 Next topic
-RAW: end of section one new paragraph section two begins
-CLEAN: End of section one
-Section two begins
 RAW: he said quote hello quote comma and waved
 CLEAN: He said "hello," and waved.
 RAW: quote hello end quote period
@@ -408,10 +1055,6 @@ If the transcript is empty or only filler, return exactly EMPTY."""
         "apostrophe",
     )
 
-    # Spoken line-break commands. Every one of them maps to the same soft
-    # break so the user never has to remember which app does what — and a
-    # soft break (Shift+Enter) never submits chat-style text boxes. Longest
-    # phrase first so "new paragraph" is not partially consumed as "new line".
     _EDGE_BREAKS = (
         ("new paragraph", "\n"),
         ("new line", "\n"),
@@ -437,13 +1080,7 @@ If the transcript is empty or only filler, return exactly EMPTY."""
         return any(f" {cue} " in normalized for cue in self.COMMAND_CUES)
 
     def _extract_line_break_commands(self, text: str) -> tuple[str, str, str]:
-        """Split edge line-break commands off a transcript.
-
-        Returns (leading_breaks, core, trailing_breaks). Saying "new line"
-        or "new paragraph" at the very start or end of a dictation is cursor
-        navigation, so it is applied deterministically instead of asking the
-        language model to emit leading or trailing newlines.
-        """
+        """Split deterministic edge line-break commands from spoken text."""
         core = text.strip()
         leading, trailing = "", ""
         while True:
@@ -471,12 +1108,7 @@ If the transcript is empty or only filler, return exactly EMPTY."""
         return leading, core.strip(), trailing
 
     def _tighten_quote_spacing(self, text: str) -> str:
-        """Remove spaces directly inside paired quotation marks.
-
-        The small model sometimes leaves padding like `" hello "`. Standard
-        typography never has a space right inside a quote, so this is safe to
-        fix deterministically; the space after a closing quote is untouched.
-        """
+        """Remove model-added spaces directly inside paired straight quotes."""
         chars = list(text)
         is_opening = True
         for index, char in enumerate(chars):
@@ -495,35 +1127,20 @@ If the transcript is empty or only filler, return exactly EMPTY."""
             is_opening = not is_opening
         return "".join(chars)
 
-    def _normalize_model_breaks(self, cleaned: str, core: str) -> str:
-        """Collapse the model's newline clusters into single soft breaks.
-
-        The small model is not consistent about one newline versus two, and
-        every spoken line-break command means the same soft break, so any run
-        of newlines becomes exactly one.
-        """
-        result = []
-        in_break = False
-        for char in cleaned:
-            if char == "\n":
-                if not in_break:
-                    result.append("\n")
-                in_break = True
-            else:
-                result.append(char)
-                in_break = False
-        return "".join(result)
+    def _normalize_model_breaks(self, cleaned: str) -> str:
+        """Collapse model newline clusters into single safe soft breaks."""
+        return re.sub(r"\n+", "\n", cleaned)
 
     def clean(self, transcript: str) -> tuple[str, bool]:
         """Return (text, cleanup_used), falling back to raw text on failure."""
-        raw = transcript.strip()
+        # Preserve local leading/trailing line-break commands on the fast path.
+        raw = transcript.strip(" \t\r")
         self.last_error = None
         if not self.should_clean(raw):
             return raw, False
 
         leading, core, trailing = self._extract_line_break_commands(raw)
         if not core:
-            # The dictation was only line-break commands; no model call needed.
             return leading + trailing, True
 
         api_key = (self.settings.get("groq_api_key") or "").strip()
@@ -532,7 +1149,7 @@ If the transcript is empty or only filler, return exactly EMPTY."""
             logger.warning(self.last_error)
             return raw, False
 
-        model = self.settings.get("cleanup_model", "llama-3.1-8b-instant")
+        model = self.settings.get("cleanup_model", "openai/gpt-oss-20b")
         payload = {
             "model": model,
             "temperature": 0,
@@ -572,8 +1189,7 @@ If the transcript is empty or only filler, return exactly EMPTY."""
                 raise ValueError("empty cleanup output")
             if cleaned.startswith("```") or len(cleaned) > max(len(raw) * 3, len(raw) + 300):
                 raise ValueError("unsafe cleanup output")
-            # Every spoken line-break command is a soft break (Shift+Enter).
-            cleaned = self._normalize_model_breaks(cleaned, core)
+            cleaned = self._normalize_model_breaks(cleaned)
             cleaned = self._tighten_quote_spacing(cleaned)
             return leading + cleaned + trailing, True
         except Exception as exc:
@@ -760,27 +1376,45 @@ class Transcriber:
         if prompt:
             data["prompt"] = prompt
 
-        # Provider hiccups (5xx responses, dropped connections) are common
-        # and brief, so try once more before failing the dictation.
         for attempt in (1, 2):
             wav_buffer.seek(0)
             files = {"file": ("audio.wav", wav_buffer, "audio/wav")}
             try:
-                resp = requests.post(url, headers=headers, files=files, data=data, timeout=30)
+                resp = requests.post(
+                    url, headers=headers, files=files, data=data, timeout=30
+                )
                 if resp.status_code == 200:
                     return resp.json().get("text", "").strip()
                 if resp.status_code in (401, 403):
-                    self.last_error = f"{provider_name} rejected the API key. Check it in Settings."
-                    logger.error("%s API error %s: %s", provider_name, resp.status_code, resp.text[:300])
+                    self.last_error = (
+                        f"{provider_name} rejected the API key. Check it in Settings."
+                    )
+                    logger.error(
+                        "%s API error %s: %s",
+                        provider_name,
+                        resp.status_code,
+                        resp.text[:300],
+                    )
                     return ""
-                logger.error("%s API error %s: %s", provider_name, resp.status_code, resp.text[:300])
+                logger.error(
+                    "%s API error %s: %s",
+                    provider_name,
+                    resp.status_code,
+                    resp.text[:300],
+                )
                 if resp.status_code < 500 or attempt == 2:
-                    self.last_error = f"{provider_name} transcription failed (HTTP {resp.status_code})."
+                    self.last_error = (
+                        f"{provider_name} transcription failed (HTTP {resp.status_code})."
+                    )
                     return ""
             except Exception:
-                logger.exception("Cloud transcription request failed (%s)", provider_name)
+                logger.exception(
+                    "Cloud transcription request failed (%s)", provider_name
+                )
                 if attempt == 2:
-                    self.last_error = f"{provider_name} connection failed. Check your internet connection."
+                    self.last_error = (
+                        f"{provider_name} connection failed. Check your internet connection."
+                    )
                     return ""
             logger.info("%s request failed; retrying once...", provider_name)
             time.sleep(0.8)
@@ -788,13 +1422,7 @@ class Transcriber:
 
 
 def type_text_with_breaks(controller, text: str):
-    """Type dictation text, converting line breaks into key presses.
-
-    Every line break becomes Shift+Enter — a soft break that moves down one
-    line in documents and never submits chat-style text boxes. Say the
-    line-break command twice for a blank line. Plain Enter is never typed,
-    so dictation can never accidentally send a message.
-    """
+    """Type newlines as Shift+Enter so chat-style fields are never submitted."""
     for line_index, line in enumerate(text.split("\n")):
         if line_index:
             with controller.pressed(Key.shift):
@@ -808,35 +1436,36 @@ class MoneyPennyApp:
     """Main application class."""
 
     def __init__(self):
+        self.version = APP_VERSION
         self.settings = Settings()
         self.lexicon = Lexicon()
+        self.corrections = ExactCorrections()
         self.transcriber = Transcriber(self.settings, self.lexicon)
         self.cleaner = TranscriptCleaner(self.settings)
         self.history = TranscriptHistory()
+        self.correction_tracker = CorrectionTracker()
 
         # Audio state
         self.is_recording = False
         self.audio_frames = []
         self.frames_lock = threading.Lock()
-        # Rolling pre-roll so a fast hotkey press still captures the first
-        # instants of speech (roughly the last half second of audio).
         self.preroll = deque(maxlen=8)
         self.p = pyaudio.PyAudio()
         self.stream = None
         self.stop_event = threading.Event()
         self.keyboard_controller = Controller()
-        # Serialize dictation end-to-end: one transcript is transcribed,
-        # cleaned, and typed at a time so overlapping requests cannot paste
-        # twice or out of order when the cloud provider stalls.
         self.dictation_lock = threading.Lock()
 
         # GUI state
         self.gui = None
         self.tray_icon = None
+        self.activation_event_handle = None
+        self.correction_hook = None
 
         # Status callbacks
         self.status_callbacks = []
         self.history_callbacks = []
+        self.correction_suggestion_callbacks = []
 
     def add_status_callback(self, callback):
         """Register a callback for status updates."""
@@ -845,6 +1474,10 @@ class MoneyPennyApp:
     def add_history_callback(self, callback):
         """Register a callback for captured-transcript history updates."""
         self.history_callbacks.append(callback)
+
+    def add_correction_suggestion_callback(self, callback):
+        """Register a GUI callback for confirm-before-save suggestions."""
+        self.correction_suggestion_callbacks.append(callback)
 
     def load_model_async(self):
         """Load the Whisper model in a background thread.
@@ -881,6 +1514,13 @@ class MoneyPennyApp:
             except Exception:
                 pass
 
+    def _notify_correction_suggestion(self, heard: str, written: str):
+        for callback in self.correction_suggestion_callbacks:
+            try:
+                callback(heard, written)
+            except Exception:
+                pass
+
     def get_microphones(self) -> list:
         """Get list of available microphone devices."""
         devices = []
@@ -898,10 +1538,10 @@ class MoneyPennyApp:
 
     def start_recording(self):
         """Begin recording when hotkey is pressed."""
+        self.correction_tracker.cancel()
         if self.is_recording:
             return
         with self.frames_lock:
-            # Seed with the pre-roll so very quick presses keep their audio.
             self.audio_frames = list(self.preroll)
         self.is_recording = True
         self._notify_status("recording", "Hold hotkey, speak now...")
@@ -915,11 +1555,7 @@ class MoneyPennyApp:
         threading.Thread(target=self._transcribe_and_type, daemon=True).start()
 
     def _transcribe_and_type(self):
-        """Transcribe recorded audio and type it.
-
-        Runs under the dictation lock so concurrent dictations queue up and
-        type in order instead of pasting over each other.
-        """
+        """Serialize complete dictations so cloud stalls cannot double-type."""
         with self.dictation_lock:
             self._transcribe_and_type_locked()
 
@@ -940,12 +1576,19 @@ class MoneyPennyApp:
 
         if text:
             logger.info("Raw transcript (%.2fs): %s", elapsed, text)
+            text, applied_corrections = self.corrections.apply(text)
+            if applied_corrections:
+                logger.info("Applied exact corrections: %s", applied_corrections)
+            text, applied_commands = apply_spoken_punctuation(text)
+            if applied_commands:
+                logger.info("Applied local punctuation commands: %s", applied_commands)
             if self.cleaner.should_clean(text):
                 self._notify_status("cleaning", "Applying context-aware cleanup...")
             text, cleanup_used = self.cleaner.clean(text)
             if self.cleaner.last_error:
                 logger.info(self.cleaner.last_error)
             text = self._strip_stock_phrases(text)
+            text = normalize_punctuation_collisions(text)
         if text:
             total_elapsed = time.time() - start_time
             logger.info("Final transcript (%.2fs): %s", total_elapsed, text)
@@ -958,9 +1601,10 @@ class MoneyPennyApp:
             # Wait for modifier keys to release
             self._wait_for_modifiers_release()
 
-            # Type the text (no leading space when cleanup starts a new line)
+            # Newlines are safe Shift+Enter breaks; never bare Enter.
             prefix = "" if text.startswith("\n") else " "
             type_text_with_breaks(self.keyboard_controller, prefix + text)
+            self._arm_correction_recognition(text)
         else:
             if self.transcriber.last_error:
                 logger.warning("Transcription failed: %s", self.transcriber.last_error)
@@ -1005,13 +1649,7 @@ class MoneyPennyApp:
         return False
 
     def _record_thread_func(self):
-        """Keep the microphone warm and capture dictation audio.
-
-        The stream stays open so the very first frames after a hotkey press
-        are never lost to device startup latency. While idle, the most recent
-        chunks are kept in a small pre-roll buffer that seeds each recording,
-        which keeps even very quick press-and-release captures usable.
-        """
+        """Keep the microphone warm and retain a short idle pre-roll."""
         while not self.stop_event.is_set():
             if self.stream is None or not self.stream.is_active():
                 try:
@@ -1051,6 +1689,85 @@ class MoneyPennyApp:
             logger.exception("Failed to register hotkeys")
             raise
 
+    def _setup_correction_recognition(self):
+        """Observe a narrow post-dictation correction window without suppression."""
+        if self.correction_hook is not None:
+            return
+
+        def _on_key(event):
+            if event.event_type != "down" or not self.correction_tracker.active:
+                return
+            if not self.settings.get("correction_recognition_enabled", True):
+                self.correction_tracker.cancel()
+                return
+            context, is_secure = _get_keyboard_focus_context()
+            if is_secure:
+                self.correction_tracker.cancel()
+                return
+            try:
+                self.correction_tracker.handle_key(
+                    event.name,
+                    context,
+                    shift=keyboard.is_pressed("shift"),
+                    caps_lock=_caps_lock_is_on(),
+                    ctrl=keyboard.is_pressed("ctrl"),
+                    alt=keyboard.is_pressed("alt"),
+                )
+            except Exception:
+                logger.exception("Correction recognition key handler failed")
+                self.correction_tracker.cancel()
+
+        self.correction_hook = keyboard.hook(_on_key, suppress=False)
+        threading.Thread(
+            target=self._correction_monitor_func,
+            name="MoneyPennyCorrectionMonitor",
+            daemon=True,
+        ).start()
+        logger.info("Correction recognition enabled: 10-second direct-edit window")
+
+    def _arm_correction_recognition(self, text: str):
+        if (
+            self.correction_hook is None
+            or not self.settings.get("correction_recognition_enabled", True)
+        ):
+            return
+        context, is_secure = _get_keyboard_focus_context()
+        if is_secure:
+            logger.info("Correction recognition skipped for a secure field")
+            return
+        if self.correction_tracker.arm(text, context):
+            logger.info("Correction recognition armed for 10 seconds")
+
+    def _correction_monitor_func(self):
+        while not self.stop_event.is_set():
+            if not self.correction_tracker.active:
+                time.sleep(0.05)
+                continue
+            if _mouse_button_is_pressed():
+                self.correction_tracker.cancel()
+                logger.info("Correction recognition canceled by mouse input")
+                time.sleep(0.1)
+                continue
+            context, is_secure = _get_keyboard_focus_context()
+            if is_secure:
+                self.correction_tracker.cancel()
+                continue
+            suggestion = self.correction_tracker.poll(context)
+            if suggestion:
+                heard, written = suggestion
+                logger.info(
+                    "Correction recognition suggested: %r -> %r", heard, written
+                )
+                self._notify_correction_suggestion(heard, written)
+            time.sleep(0.05)
+
+    def accept_correction_suggestion(self, heard: str, written: str) -> bool:
+        if self.corrections.add(heard, written):
+            logger.info("Learned confirmed correction: %r -> %r", heard, written)
+            return True
+        logger.info("Did not learn duplicate correction for %r", heard)
+        return False
+
     def shutdown(self):
         """Gracefully shut down the application."""
         if self.stop_event.is_set():
@@ -1059,6 +1776,14 @@ class MoneyPennyApp:
         self._notify_status("shutdown", "Exiting...")
         self.is_recording = False
         self.stop_event.set()
+        self.correction_tracker.cancel()
+
+        if self.correction_hook is not None:
+            try:
+                keyboard.unhook(self.correction_hook)
+            except Exception:
+                pass
+            self.correction_hook = None
 
         # Force exit after short delay if graceful shutdown fails
         def force_exit():
@@ -1096,7 +1821,7 @@ class MoneyPennyApp:
         keyboard.add_hotkey("esc", lambda: self.shutdown())
         keyboard.add_hotkey("ctrl+alt+q", lambda: self.shutdown())
 
-        logger.info("--- MoneyPenny Voice Typing v3.1.1 ---")
+        logger.info("--- MoneyPenny Voice Typing v3.1 ---")
         logger.info("Hold %s to dictate; release to transcribe.",
                    self.settings.get("record_hotkey", "right ctrl"))
         logger.info("Press ESC or CTRL+ALT+Q to exit.")
@@ -1129,6 +1854,9 @@ class MoneyPennyApp:
 
         # Create and show the GUI immediately so the window appears right away.
         self.gui = MoneyPennyGUI(self)
+        self.gui.create_window()
+        self._setup_correction_recognition()
+        self._start_activation_listener()
         self.tray_icon = create_tray_icon(self, self.gui)
 
         # Run tray in background thread
@@ -1140,6 +1868,34 @@ class MoneyPennyApp:
 
         # Run GUI main loop
         self.gui.run()
+
+    def _start_activation_listener(self):
+        """Forward second-launch requests without touching Tk off-thread."""
+        if not self.activation_event_handle or not self.gui:
+            return
+
+        def _listen():
+            try:
+                import ctypes
+                from ctypes import wintypes
+
+                kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+                kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+                kernel32.WaitForSingleObject.restype = wintypes.DWORD
+                WAIT_OBJECT_0 = 0
+                while not self.stop_event.is_set():
+                    if kernel32.WaitForSingleObject(
+                        self.activation_event_handle, 250
+                    ) == WAIT_OBJECT_0:
+                        self.gui.request_activation()
+            except Exception:
+                logger.exception("Window activation listener stopped unexpectedly")
+
+        threading.Thread(
+            target=_listen,
+            name="MoneyPennyActivationListener",
+            daemon=True,
+        ).start()
 
     def _quit_from_gui(self):
         """Handle quit from GUI or hotkey."""
@@ -1167,10 +1923,12 @@ def main():
 
     instance_lock = _acquire_single_instance_lock()
     if instance_lock is None:
-        _notify_already_running()
+        _signal_existing_instance()
         sys.exit(0)
 
+    activation_event = _create_activation_event()
     app = MoneyPennyApp()
+    app.activation_event_handle = activation_event
 
     # Install signal handlers
     try:

@@ -37,7 +37,7 @@ jobs:
       - name: Assemble release folder
         shell: pwsh
         run: |
-          Copy-Item README.md, QuickStart-CheatSheet.md, LICENSE, lexicon.example.txt, moneypenny.ico -Destination dist/MoneyPenny
+          Copy-Item README.md, QuickStart-CheatSheet.md, LICENSE, lexicon.example.txt, corrections.example.json, moneypenny.ico -Destination dist/MoneyPenny
           Copy-Item Install-MoneyPennyShortcuts.ps1, "Create MoneyPenny Shortcuts.bat" -Destination dist/MoneyPenny
           Compress-Archive -Path dist/MoneyPenny/* -DestinationPath MoneyPenny-Windows-x64.zip -Force
 

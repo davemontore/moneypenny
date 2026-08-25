@@ -4,7 +4,7 @@
 
 - Hold **RIGHT CTRL** while speaking; release it to type the transcription into the app you are using.
 - Choose fast cloud transcription or a slower offline local model in MoneyPenny's Settings tab.
-- The default **Commands only** cleanup keeps ordinary dictation on the fast single-request path and invokes contextual cleanup only for likely verbal punctuation.
+- Common punctuation commands run locally. The default **Commands only** cleanup keeps ordinary dictation on the fast path and invokes contextual cleanup only for remaining ambiguous punctuation.
 - Closing the settings window hides MoneyPenny to the system tray; it does not quit the app.
 
 ## Install and start
@@ -26,11 +26,18 @@
 
 ### Spoken punctuation
 
-- Say `quote hello quote` to type `"hello"`.
-- You can also say `open quote hello close quote` or `open quote hello end quote`.
-- Other commands include `comma`, `period`, `question mark`, `exclamation point`, `colon`, `semicolon`, `new line` / `new paragraph` (line break; works in every app, never sends — say twice for a blank line), `open parenthesis`, `close parenthesis`, `slash`, and `backslash`.
+- Quotes: say `quote ... end quote`, `quote ... quote`, or `open quote ... close quote`.
+- Other commands include `comma`, `period`, `question mark`, `exclamation point`, `colon`, `semicolon`, `new line` / `new paragraph` (the same safe Shift+Enter break; say either twice for a blank line), `open parenthesis`, `close parenthesis`, `slash`, and `backslash`.
 - To discuss punctuation as words, use natural context such as `the word comma` or `a comma`.
 - The full command reference is on the Dictionary tab.
+
+### Teach an immediate correction
+
+1. Within 10 seconds of a transcript appearing, press Backspace and retype its ending.
+2. Do not click elsewhere or move the caret during the correction.
+3. Pause for about one second and confirm MoneyPenny's proposed correction.
+
+MoneyPenny saves nothing if you decline. Turn this trial feature off with **Suggest corrections after immediate Backspace and retype** in Settings.
 
 ## Start automatically at login (optional)
 
@@ -43,8 +50,9 @@
 
 - `settings.json` stores your choices and API keys.
 - `lexicon.txt` stores your custom vocabulary.
+- `corrections.json` stores guaranteed heard-as → type-as replacements.
 - `transcript_history.jsonl` stores raw and cleaned captured transcripts for the History tab.
-- All three files remain on your computer and are excluded from GitHub.
+- All four files remain on your computer and are excluded from GitHub.
 
 ## Quick troubleshooting
 

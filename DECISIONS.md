@@ -4,13 +4,45 @@ Significant project decisions, with date, reason, and practical consequence.
 
 ---
 
-## 2026-08-13 — One universal line break; quote synonyms; never type bare Enter
+## 2026-08-25 — Common punctuation commands must not depend on a cleanup model
 
-**Decision:** `new line`, `newline`, and `new paragraph` all do exactly the same thing: a soft line break typed as Shift+Enter. MoneyPenny never types a bare Enter. `end quote` is a full synonym of `close quote` in every quote pairing. Break tokens are extracted at the transcript edges in code, the language model only decides mid-sentence cases, and all model output is normalized deterministically (newline runs collapsed to one break, spaces tightened inside quotes).
+**Decision:** Parse paired quotes and common verbal punctuation locally before
+the optional contextual cleanup pass. Preserve explicit literal forms such as
+"the word comma", "a colon", and "say colon". Migrate the retired Groq cleanup
+model from `llama-3.1-8b-instant` to `openai/gpt-oss-20b` for remaining
+ambiguities.
 
-**Reason:** A build that typed Enter twice for "new paragraph" sent the user's chat message mid-dictation, and requiring different commands per app ("new line in chat, new paragraph in documents") transfers complexity to the user every single time they dictate. The small cleanup model (llama-3.1-8b-instant) also proved inconsistent about emitting one newline versus two, so exact formatting cannot be delegated to it.
+**Reason:** Groq shut down `llama-3.1-8b-instant` on August 16, 2026. The app's
+safe raw-text fallback then made every punctuation request appear to succeed
+while leaking the spoken commands into the final text. A deterministic local
+path keeps core dictation behavior available through model retirement, network
+failure, missing credentials, and Cleanup Off mode.
 
-**Practical consequence:** A blank line is always "say the line-break command twice." Documents receive soft breaks rather than true paragraph marks — an acceptable trade for a command that can never accidentally send a message anywhere. "new paragraph" is kept as an alias so old muscle memory still works.
+**Practical consequence:** `quote ... end quote`, the existing quote variants,
+single punctuation commands, line breaks, parentheses, and slashes add no
+network latency. Literal and unmatched forms can still reach contextual cleanup
+when enabled. Existing saved model settings migrate automatically.
+
+Sources: https://console.groq.com/docs/deprecations and
+https://console.groq.com/docs/models
+
+---
+
+## 2026-08-13 — One universal line break; never type bare Enter
+
+**Decision:** `new line`, `newline`, and `new paragraph` all produce the same
+soft line break typed as Shift+Enter. MoneyPenny never types a bare Enter. Say
+any line-break command twice for a blank line.
+
+**Reason:** Bare Enter can submit chat-style text boxes, and per-application
+behavior would force the user to classify every focused editor before speaking.
+Fast cleanup models are also inconsistent about emitting one newline versus
+two, so code must enforce the exact mechanics.
+
+**Practical consequence:** Documents receive soft breaks rather than true
+paragraph marks—an acceptable trade for one composable command that cannot
+accidentally send a message. Local parsing handles routine commands; contextual
+cleanup only resolves remaining ambiguity.
 
 ---
 

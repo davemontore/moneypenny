@@ -44,6 +44,9 @@ settings.json
 # Personal dictionary — never publish user vocabulary
 lexicon.txt
 
+# Personal exact-correction rules
+corrections.json
+
 # Private captured-transcript history
 transcript_history.jsonl
 
