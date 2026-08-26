@@ -955,7 +955,7 @@ class MoneyPennyGUI:
             pass
 
     def _confirm_correction(self, heard: str, written: str):
-        self._deiconify()
+        """Ask about a correction without restoring the tray-hidden main window."""
         accepted = messagebox.askyesno(
             "Learn Correction?",
             f'MoneyPenny typed:\n\n"{heard}"\n\n'

@@ -4,6 +4,21 @@ Significant project decisions, with date, reason, and practical consequence.
 
 ---
 
+## 2026-08-26 — Correction prompts do not activate the main window
+
+**Decision:** Show the confirmation dialog for a detected correction without
+restoring the tray-hidden settings window. Keep full-window restoration limited
+to explicit activation requests such as launching MoneyPenny again.
+
+**Reason:** Learning a correction requires a quick yes-or-no response, not a
+context switch into the settings interface. Restoring the main window obscured
+the application where the user had just edited their dictation.
+
+**Practical consequence:** A correction suggestion presents only its modal
+confirmation. The main GUI remains hidden unless the user explicitly opens it.
+
+---
+
 ## 2026-08-25 — Common punctuation commands must not depend on a cleanup model
 
 **Decision:** Parse paired quotes and common verbal punctuation locally before

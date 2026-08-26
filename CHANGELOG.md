@@ -6,6 +6,7 @@
 ### Current Changes
 - Added opt-out correction recognition: immediate Backspace-and-retype edits within 10 seconds produce a confirm-before-save exact-correction suggestion
 - Correction recognition is limited to the same focused control, cancels on mouse/navigation/window changes, skips detectable secure fields, and never suppresses user input
+- Correction confirmations now appear without restoring the tray-hidden settings window
 - Fixed verbal punctuation failures caused by Groq's retirement of `llama-3.1-8b-instant`; existing settings migrate to `openai/gpt-oss-20b`
 - Added dependency-free local parsing for paired quotes (`quote ... end quote` included), common punctuation, line breaks, parentheses, and slashes
 - Protected explicit literal forms such as `the word comma`, `a colon`, and `say colon` from local command replacement

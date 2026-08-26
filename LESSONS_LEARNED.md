@@ -4,6 +4,17 @@ Reusable lessons from building MoneyPenny. Newest first.
 
 ---
 
+## 2026-08-26 — A prompt is not a request to restore the whole tray app
+
+Tray applications often need two different visibility behaviors: explicit app
+activation should restore and focus the main window, while a narrow confirmation
+should surface only its dialog. Reusing the activation helper for both makes a
+small decision interrupt the user's work and cover the context they just edited.
+Keep dialog presentation separate from main-window restoration, and test the
+absence of the restore call as part of the interaction contract.
+
+---
+
 ## 2026-08-13 — Never make the user remember per-app behavior; never trust a small model's formatting
 
 Two related lessons from the line-break work. First, a command that behaves differently depending on which app has focus (Enter in documents, Shift+Enter in chat) forces the user to classify every text box before dictating — they will rightly reject it. Prefer one universal, always-safe behavior plus a compositional rule (say it twice for a blank line). Second, small fast models are inconsistent about exact output details such as one newline versus two; keep the model's job contextual (command versus prose) and enforce the mechanics deterministically around it: extract unambiguous edge commands in code, collapse newline runs, tighten quote spacing. Reusable rule: LLM decides *what*, code decides *exactly how*.
