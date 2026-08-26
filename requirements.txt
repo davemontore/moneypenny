@@ -3,6 +3,8 @@ pyaudio==0.2.14
 keyboard==0.13.5
 pynput==1.8.2
 faster-whisper==1.2.1
+comtypes==1.4.16
+uiautomation==2.0.29
 
 # Cloud transcription (Groq hosted Whisper)
 requests==2.34.2

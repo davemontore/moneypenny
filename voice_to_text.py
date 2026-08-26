@@ -23,6 +23,12 @@ import socket
 import re
 from datetime import datetime
 
+from insertion_context import (
+    CaretContextProbe,
+    prepare_text_for_insertion,
+    read_text_before_caret,
+)
+
 
 def _force_ipv4():
     """Force outbound connections to use IPv4.
@@ -496,12 +502,21 @@ class ExactCorrections:
         if not text or self._pattern is None:
             return text, []
         applied = []
+        first_lexical_index = next(
+            (
+                index
+                for index, character in enumerate(text)
+                if character.isalnum()
+            ),
+            None,
+        )
 
         def replace_match(match):
             rule = self._by_heard[match.group(0).casefold()]
             applied.append({
                 "heard": match.group(0),
                 "written": rule["written"],
+                "at_first_lexical_token": match.start() == first_lexical_index,
             })
             return rule["written"]
 
@@ -1432,6 +1447,21 @@ def type_text_with_breaks(controller, text: str):
             controller.type(line)
 
 
+def _read_text_before_caret(max_chars: int) -> str | None:
+    return read_text_before_caret(
+        _get_keyboard_focus_context,
+        max_chars=max_chars,
+    )
+
+
+_caret_context_probe = CaretContextProbe(_read_text_before_caret)
+
+
+def _get_text_before_caret(max_chars: int = 256) -> str | None:
+    """Read caret context within a bounded, capacity-one background probe."""
+    return _caret_context_probe.read(max_chars=max_chars)
+
+
 class MoneyPennyApp:
     """Main application class."""
 
@@ -1577,6 +1607,11 @@ class MoneyPennyApp:
         if text:
             logger.info("Raw transcript (%.2fs): %s", elapsed, text)
             text, applied_corrections = self.corrections.apply(text)
+            protected_initial_texts = tuple(
+                correction["written"]
+                for correction in applied_corrections
+                if correction.get("at_first_lexical_token")
+            )
             if applied_corrections:
                 logger.info("Applied exact corrections: %s", applied_corrections)
             text, applied_commands = apply_spoken_punctuation(text)
@@ -1591,20 +1626,30 @@ class MoneyPennyApp:
             text = normalize_punctuation_collisions(text)
         if text:
             total_elapsed = time.time() - start_time
+
+            # Wait until the hotkey is released, then inspect the actual caret
+            # location. This lets a new dictation continue an unfinished
+            # sentence without treating every recording as a sentence start.
+            self._wait_for_modifiers_release()
+            preceding_text = _get_text_before_caret()
+            prefix, text = prepare_text_for_insertion(
+                text,
+                preceding_text,
+                protected_initial_texts=protected_initial_texts,
+            )
+
             logger.info("Final transcript (%.2fs): %s", total_elapsed, text)
             mode = self.settings.get("transcription_mode", "local")
             provider = self.settings.get("cloud_provider", "local") if mode == "cloud" else "local"
+
+            # Emit while the verified focus is still current. UI callbacks may
+            # move focus, so history/status notifications follow typing.
+            type_text_with_breaks(self.keyboard_controller, prefix + text)
+            self._arm_correction_recognition(text)
+
             self.history.add(raw_text, text, mode, provider, total_elapsed, cleanup_used)
             self._notify_history()
             self._notify_status("typing", f"Typed: {text[:50]}...")
-
-            # Wait for modifier keys to release
-            self._wait_for_modifiers_release()
-
-            # Newlines are safe Shift+Enter breaks; never bare Enter.
-            prefix = "" if text.startswith("\n") else " "
-            type_text_with_breaks(self.keyboard_controller, prefix + text)
-            self._arm_correction_recognition(text)
         else:
             if self.transcriber.last_error:
                 logger.warning("Transcription failed: %s", self.transcriber.last_error)

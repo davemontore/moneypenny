@@ -5,7 +5,12 @@ Shared domain vocabulary for this project — entities, named processes, and sta
 ## Transcript transformation
 
 ### Transcript pipeline
-The ordered transformation from recognized speech to emitted text, with locally observable stages that can apply exact corrections, spoken commands, optional contextual cleanup, and final normalization.
+The ordered transformation from recognized speech to emitted text, with locally observable stages that can apply exact corrections, spoken commands, optional contextual cleanup, final normalization, and caret-aware insertion preparation.
+
+### Insertion context
+Text immediately before the active caret, inspected without changing the editor or clipboard, that determines whether dictated text needs a separator and whether its first word continues an unfinished sentence.
+
+When Insertion context is unavailable, secure, unstable, or too slow to read safely, the Transcript pipeline preserves its legacy spacing and capitalization behavior instead of guessing.
 
 ### Preferred vocabulary
 A private set of terms supplied to transcription as recognition hints; it can improve recognition but does not guarantee the final spelling, capitalization, or symbols.

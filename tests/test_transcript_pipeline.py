@@ -1,8 +1,10 @@
 import io
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock, patch
 
 from voice_to_text import (
@@ -13,8 +15,10 @@ from voice_to_text import (
     TranscriptCleaner,
     TranscriptHistory,
     Transcriber,
+    _get_text_before_caret,
     apply_spoken_punctuation,
     normalize_punctuation_collisions,
+    prepare_text_for_insertion,
     type_text_with_breaks,
 )
 
@@ -426,6 +430,241 @@ class TypeTextWithBreaksTests(unittest.TestCase):
         self.assertEqual(controller.release.call_count, 2)
         for call in controller.pressed.call_args_list:
             self.assertEqual(call.args[0], Key.shift)
+
+
+class InsertionPreparationTests(unittest.TestCase):
+    def test_exact_correction_at_first_lexical_token_keeps_written_capitalization(self):
+        corrections = ExactCorrections(Path("missing-test-corrections.json"))
+        corrections.rules = [{"heard": "alice", "written": "Alice"}]
+        corrections._rebuild_matcher()
+        corrected, applied = corrections.apply("alice arrived.")
+
+        protected = tuple(
+            correction["written"]
+            for correction in applied
+            if correction["at_first_lexical_token"]
+        )
+        self.assertEqual(
+            prepare_text_for_insertion(
+                corrected,
+                "Earlier words  ",
+                protected_initial_texts=protected,
+            ),
+            ("", "Alice arrived."),
+        )
+
+    def test_unfinished_sentence_uses_existing_space_and_lowercases_first_word(self):
+        self.assertEqual(
+            prepare_text_for_insertion("And then I left.", "I stayed  "),
+            ("", "and then I left."),
+        )
+
+    def test_unfinished_sentence_adds_one_missing_space(self):
+        self.assertEqual(
+            prepare_text_for_insertion("Because it rained.", "I stayed"),
+            (" ", "because it rained."),
+        )
+
+    def test_sentence_document_and_line_starts_keep_capitalization(self):
+        cases = (
+            ("Hello again.", "Previous sentence.  ", ("", "Hello again.")),
+            ("Hello again.", "Previous question? ", ("", "Hello again.")),
+            ("Hello again.", "Previous line\n  ", ("", "Hello again.")),
+            ("Hello again.", "", ("", "Hello again.")),
+        )
+        for transcript, context, expected in cases:
+            with self.subTest(context=context):
+                self.assertEqual(
+                    prepare_text_for_insertion(transcript, context),
+                    expected,
+                )
+
+    def test_unknown_context_preserves_legacy_behavior(self):
+        self.assertEqual(
+            prepare_text_for_insertion("Hello again.", None),
+            (" ", "Hello again."),
+        )
+
+    def test_acronyms_mixed_case_names_and_pronoun_i_are_preserved(self):
+        cases = ("NASA launched.", "OpenAI responded.", "I'm ready.")
+        for transcript in cases:
+            with self.subTest(transcript=transcript):
+                self.assertEqual(
+                    prepare_text_for_insertion(transcript, "Earlier words  "),
+                    ("", transcript),
+                )
+
+    def test_leading_quote_does_not_hide_title_cased_first_word(self):
+        self.assertEqual(
+            prepare_text_for_insertion('"This continues."', "He said  "),
+            ("", '"this continues."'),
+        )
+
+    def test_dictation_pipeline_uses_caret_context_before_typing(self):
+        app = MoneyPennyApp.__new__(MoneyPennyApp)
+        app.frames_lock = __import__("threading").Lock()
+        app.audio_frames = [b"audio"]
+        app.transcriber = Mock()
+        app.transcriber.transcribe.return_value = "And then I left."
+        app.transcriber.last_error = None
+        app.corrections = Mock()
+        app.corrections.apply.side_effect = lambda text: (text, [])
+        app.cleaner = Mock()
+        app.cleaner.should_clean.return_value = False
+        app.cleaner.clean.side_effect = lambda text: (text, False)
+        app.cleaner.last_error = None
+        app.history = Mock()
+        app.settings = FakeSettings(transcription_mode="local")
+        app.keyboard_controller = MagicMock()
+        app._notify_history = Mock()
+        app._notify_status = Mock()
+        app._wait_for_modifiers_release = Mock()
+        app._arm_correction_recognition = Mock()
+
+        with patch("voice_to_text._get_text_before_caret", return_value="I stayed  "):
+            app._transcribe_and_type_locked()
+
+        app.keyboard_controller.type.assert_called_once_with("and then I left.")
+        self.assertEqual(app.history.add.call_args.args[1], "and then I left.")
+        app._arm_correction_recognition.assert_called_once_with("and then I left.")
+
+    def test_pipeline_preserves_initial_exact_correction_in_continuation(self):
+        app = MoneyPennyApp.__new__(MoneyPennyApp)
+        app.frames_lock = __import__("threading").Lock()
+        app.audio_frames = [b"audio"]
+        app.transcriber = Mock()
+        app.transcriber.transcribe.return_value = "alice arrived."
+        app.transcriber.last_error = None
+        app.corrections = ExactCorrections(Path("missing-test-corrections.json"))
+        app.corrections.rules = [{"heard": "alice", "written": "Alice"}]
+        app.corrections._rebuild_matcher()
+        app.cleaner = Mock()
+        app.cleaner.should_clean.return_value = False
+        app.cleaner.clean.side_effect = lambda text: (text, False)
+        app.cleaner.last_error = None
+        app.history = Mock()
+        app.settings = FakeSettings(transcription_mode="local")
+        app.keyboard_controller = MagicMock()
+        app._notify_history = Mock()
+        app._notify_status = Mock()
+        app._wait_for_modifiers_release = Mock()
+        app._arm_correction_recognition = Mock()
+
+        with patch("voice_to_text._get_text_before_caret", return_value="Earlier  "):
+            app._transcribe_and_type_locked()
+
+        app.keyboard_controller.type.assert_called_once_with("Alice arrived.")
+        self.assertEqual(app.history.add.call_args.args[1], "Alice arrived.")
+
+    def test_pipeline_types_and_arms_before_notification_callbacks(self):
+        app = MoneyPennyApp.__new__(MoneyPennyApp)
+        app.frames_lock = __import__("threading").Lock()
+        app.audio_frames = [b"audio"]
+        app.transcriber = Mock()
+        app.transcriber.transcribe.return_value = "And then."
+        app.transcriber.last_error = None
+        app.corrections = Mock()
+        app.corrections.apply.side_effect = lambda text: (text, [])
+        app.cleaner = Mock()
+        app.cleaner.should_clean.return_value = False
+        app.cleaner.clean.side_effect = lambda text: (text, False)
+        app.cleaner.last_error = None
+        app.history = Mock()
+        app.settings = FakeSettings(transcription_mode="local")
+        app.keyboard_controller = MagicMock()
+        app._wait_for_modifiers_release = Mock()
+        events = []
+        app.keyboard_controller.type.side_effect = lambda text: events.append("type")
+        app._arm_correction_recognition = Mock(
+            side_effect=lambda text: events.append("arm")
+        )
+        app._notify_history = Mock(side_effect=lambda: events.append("history"))
+        app._notify_status = Mock(
+            side_effect=lambda *args: events.append("status")
+        )
+
+        with patch(
+            "voice_to_text._get_text_before_caret",
+            side_effect=lambda: events.append("context") or "Earlier  ",
+        ):
+            app._wait_for_modifiers_release.side_effect = (
+                lambda: events.append("wait")
+            )
+            app._transcribe_and_type_locked()
+
+        self.assertLess(events.index("wait"), events.index("context"))
+        self.assertLess(events.index("type"), events.index("history"))
+        self.assertLess(events.index("arm"), events.index("history"))
+
+    def test_unknown_context_keeps_legacy_prefix_and_capitalization_in_pipeline(self):
+        app = MoneyPennyApp.__new__(MoneyPennyApp)
+        app.frames_lock = __import__("threading").Lock()
+        app.audio_frames = [b"audio"]
+        app.transcriber = Mock()
+        app.transcriber.transcribe.return_value = "Hello again."
+        app.transcriber.last_error = None
+        app.corrections = Mock()
+        app.corrections.apply.side_effect = lambda text: (text, [])
+        app.cleaner = Mock()
+        app.cleaner.should_clean.return_value = False
+        app.cleaner.clean.side_effect = lambda text: (text, False)
+        app.cleaner.last_error = None
+        app.history = Mock()
+        app.settings = FakeSettings(transcription_mode="local")
+        app.keyboard_controller = MagicMock()
+        app._notify_history = Mock()
+        app._notify_status = Mock()
+        app._wait_for_modifiers_release = Mock()
+        app._arm_correction_recognition = Mock()
+
+        with patch("voice_to_text._get_text_before_caret", return_value=None):
+            app._transcribe_and_type_locked()
+
+        app.keyboard_controller.type.assert_called_once_with(" Hello again.")
+
+
+class CaretContextTests(unittest.TestCase):
+    def test_accessibility_range_reads_only_text_before_selection_start(self):
+        text_range = MagicMock()
+        preceding_range = MagicMock()
+        preceding_range.GetText.return_value = "Earlier words  "
+        text_range.Clone.return_value = preceding_range
+        pattern = Mock()
+        pattern.GetSelection.return_value = [text_range]
+        control = Mock()
+        control.IsPassword = False
+        control.GetPattern.return_value = pattern
+        initializer = MagicMock()
+        auto = SimpleNamespace(
+            GetFocusedControl=Mock(return_value=control),
+            UIAutomationInitializerInThread=Mock(return_value=initializer),
+            PatternId=SimpleNamespace(TextPattern=10014),
+            TextPatternRangeEndpoint=SimpleNamespace(Start=0, End=1),
+            TextUnit=SimpleNamespace(Character=0),
+        )
+
+        with (
+            patch.dict(sys.modules, {"uiautomation": auto}),
+            patch(
+                "voice_to_text._get_keyboard_focus_context",
+                return_value=((10, 20), False),
+            ),
+        ):
+            result = _get_text_before_caret(max_chars=64)
+
+        self.assertEqual(result, "Earlier words  ")
+        preceding_range.MoveEndpointByRange.assert_called_once_with(
+            1,
+            preceding_range,
+            0,
+            waitTime=0,
+        )
+        preceding_range.MoveEndpointByUnit.assert_called_once_with(
+            0,
+            0,
+            -64,
+            waitTime=0,
+        )
 
 
 class TranscriptHistoryTests(unittest.TestCase):
