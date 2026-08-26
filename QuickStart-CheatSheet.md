@@ -26,6 +26,10 @@
 
 ### Spoken punctuation
 
+> **Pre-public limitation:** isolated commands work locally, but dense
+> coding-oriented punctuation is still being hardened. Review dictated code
+> before running or submitting it.
+
 - Quotes: say `quote ... end quote`, `quote ... quote`, or `open quote ... close quote`.
 - Other commands include `comma`, `period`, `question mark`, `exclamation point`, `colon`, `semicolon`, `new line` / `new paragraph` (the same safe Shift+Enter break; say either twice for a blank line), `open parenthesis`, `close parenthesis`, `slash`, and `backslash`.
 - To discuss punctuation as words, use natural context such as `the word comma` or `a comma`.

@@ -1,5 +1,12 @@
 # MoneyPenny Product Roadmap
 
+## Public-release gates
+
+- Harden punctuation for reliable coding use before making the project public.
+- Run a repeatable live acceptance matrix in representative code editors for isolated commands, dense symbol sequences, mixed prose/code dictation, literal punctuation references, quotes, parentheses, slashes, and line breaks.
+- Convert every reproduced punctuation failure into a focused regression test before changing parser or cleanup behavior.
+- Keep the repository and release artifacts private or draft until the coding punctuation matrix passes consistently.
+
 ## Installation and first run
 
 - Publish a prebuilt `MoneyPenny-Windows-x64.zip` for each tagged GitHub release so ordinary users do not need Python.
@@ -32,3 +39,4 @@
 
 - Add explicit pronunciation-to-output mappings, such as `Whisper Flow => Wispr Flow` and `C sharp => C#`, because the current dictionary prompt biases recognition but cannot guarantee spelling.
 - Keep Commands-only cleanup as the default latency compromise and measure transcription, optional cleanup, and typing separately in diagnostics.
+- Treat the existing spoken-command parser as a foundation rather than a completed coding interface; prioritize observed coding failures over adding speculative command aliases.

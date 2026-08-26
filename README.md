@@ -7,7 +7,7 @@
 - **Hold‑to‑record**: Press and hold RIGHT CTRL, release to transcribe
 - **Types into any app**: Output is typed into the focused window
 - **Cloud or local transcription**: Cloud mode (Groq or OpenRouter) is fast and accurate; Local mode (faster-whisper) works offline. Choose in the Settings tab.
-- **Reliable spoken punctuation**: Common commands and paired quotations run locally; ambiguous literal phrases such as "the word comma" can still use selective AI cleanup
+- **Spoken punctuation under active hardening**: Common commands and paired quotations run locally, but dense coding-oriented punctuation is not yet reliable enough for a public release
 - **Settings window + system tray**: A GUI with Settings, Dictionary, History, and Status tabs. Closing the window hides it to the tray so it keeps listening.
 - **Single-instance window restore**: Launching MoneyPenny again restores and focuses the existing window instead of opening a duplicate or an informational dialog.
 - **Preferred vocabulary and exact corrections**: Bias uncommon terminology, or guarantee local replacements such as `Whisper Flow` → `Wispr Flow` and `C sharp` → `C#`
@@ -15,6 +15,14 @@
 - **Captured transcript history**: Review raw and cleaned transcripts locally in the History tab
 - **Spoken punctuation**: Say commands such as `comma`, `question mark`, `new line` (a safe Shift+Enter break; say it twice for a blank line), or `quote ... end quote`; see the reference in the Dictionary tab
 - **Quick exit**: Press Ctrl+Alt+Q, or right-click the tray icon → Exit
+
+## Public-readiness status
+
+MoneyPenny is still pre-public. The main remaining quality gate is reliable
+punctuation while coding: repeated or tightly packed symbol commands, literal
+discussion of punctuation, and mixed prose/code dictation still need a live
+acceptance matrix across representative editors. The current local parser is a
+useful foundation, not a claim that coding punctuation is production-ready.
 
 ## 🚀 Quick Start
 
@@ -49,7 +57,8 @@ This route needs only Windows 10/11 and a microphone—Python is already include
    - Release to transcribe; text will be typed automatically
    - For quoted text, say `quote this is quoted quote` or `open quote this is quoted end quote`; MoneyPenny types `"this is quoted"`
    - For a line break, say `new line`, `newline`, or `new paragraph`; all use safe Shift+Enter and never submit a chat message. Say the command twice for a blank line.
-   - When discussing punctuation itself, use natural context such as `the word comma` or `a comma`
+- When discussing punctuation itself, use natural context such as `the word comma` or `a comma`
+- For coding, review punctuation before executing or submitting dictated code; coding-oriented punctuation remains under active hardening
    - Note: closing the window does NOT quit the app — it hides to the tray. To quit: Ctrl+Alt+Q or right-click the tray icon → Exit
 
 ### Start automatically at login

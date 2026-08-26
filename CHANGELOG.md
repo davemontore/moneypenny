@@ -15,6 +15,7 @@
 - Added local heard-as → type-as rules with whole-phrase matching, longest-match priority, and exact output casing/symbols
 - Added narrow local repair for impossible punctuation collisions such as `:.` and `,?`
 - Added regression coverage and a durable multi-session upgrade plan
+- Known limitation: dense coding-oriented punctuation remains a pre-public hardening target and should not yet be treated as production-ready
 
 ---
 

@@ -4,6 +4,22 @@ Significant project decisions, with date, reason, and practical consequence.
 
 ---
 
+## 2026-08-26 — Coding punctuation is a public-release gate
+
+**Decision:** Keep MoneyPenny pre-public until spoken punctuation is reliable
+for coding workflows, not only for isolated prose commands.
+
+**Reason:** The local parser handles a documented command set, but live use still
+shows failures in dense or mixed code dictation. Publishing a broad reliability
+claim before those cases pass a repeatable acceptance matrix would give users a
+false safety signal when dictated code can be executed or submitted.
+
+**Practical consequence:** Public-release readiness requires representative
+editor testing and focused regressions for every reproduced failure. Existing
+punctuation documentation must describe the parser as under hardening.
+
+---
+
 ## 2026-08-26 — Correction prompts do not activate the main window
 
 **Decision:** Show the confirmation dialog for a detected correction without
