@@ -1,4 +1,4 @@
-# MoneyPenny v3.1 — QuickStart Cheat Sheet (Windows)
+# MoneyPenny v3.1: QuickStart Cheat Sheet (Windows)
 
 ## What it does
 
