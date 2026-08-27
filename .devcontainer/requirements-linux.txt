@@ -1,0 +1,10 @@
+# Dependencies needed to import, edit, and test Moneypenny in Linux Codespaces.
+# Windows-only packages remain in the repository's main requirements files.
+pyaudio==0.2.14
+keyboard==0.13.5
+pynput==1.8.2
+faster-whisper==1.2.1
+requests==2.34.2
+customtkinter==6.0.0
+pystray==0.19.5
+Pillow==12.3.0

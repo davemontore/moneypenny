@@ -1,0 +1,28 @@
+{
+  "name": "Moneypenny",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12"
+    }
+  },
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+  "containerEnv": {
+    "PYNPUT_BACKEND": "dummy"
+  },
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y portaudio19-dev python3-tk && python -m venv .venv && .venv/bin/python -m pip install --upgrade pip && .venv/bin/python -m pip install -r .devcontainer/requirements-linux.txt",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python"
+      }
+    }
+  }
+}
