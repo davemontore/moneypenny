@@ -1,4 +1,4 @@
-"""MoneyPenny v3.1.2 — cloud or local voice typing for Windows."""
+"""MoneyPenny v3.1.2, cloud or local voice typing for Windows."""
 
 import pyaudio
 import keyboard
@@ -139,7 +139,7 @@ def _acquire_single_instance_lock():
         ERROR_ALREADY_EXISTS = 183
         if not mutex or ctypes.get_last_error() == ERROR_ALREADY_EXISTS:
             # Another copy owns the lock. IMPORTANT: CreateMutexW opened a
-            # handle to the existing mutex — close it immediately. If we
+            # handle to the existing mutex: close it immediately. If we
             # kept it, this (short-lived) process would keep the named
             # mutex alive even after the real app exits, and every future
             # launch would wrongly report "already running".
@@ -1009,7 +1009,7 @@ Interpret spoken punctuation from context:
 - Preserve them as words when the speaker discusses them, such as "the word comma", "a comma", or "punctuation command comma".
 - Paired "quote ... quote", "open quote ... close quote", and "open quote ... end quote" create quotation marks around only the intended words. "end quote" means exactly the same as "close quote". Leave no space between a quotation mark and the words it wraps.
 - "new line" and "new paragraph" used as commands insert exactly one newline character. Saying either command twice creates a blank line.
-- Commas and periods go inside a closing quotation mark: write "hello," and "hello." — never "hello", or "hello".
+- Commas and periods go inside a closing quotation mark: write "hello," and "hello.", never "hello", or "hello".
 - Resolve punctuation that speech recognition inserted beside a spoken command; never emit collisions such as `,:,`, doubled punctuation, or `\",.`.
 - Commands include comma, period, question mark, exclamation point, colon, semicolon, new line, new paragraph, open/close parenthesis, slash, backslash, and quote.
 

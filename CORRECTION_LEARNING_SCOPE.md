@@ -1,6 +1,6 @@
 # Correction Recognition Scope
 
-## Implemented trial — 2026-08-25
+## Implemented trial: 2026-08-25
 
 The bounded correction-recognition feature is implemented. MoneyPenny can
 reliably learn a direct backspace-and-retype correction made immediately after

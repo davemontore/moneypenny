@@ -35,13 +35,13 @@ ENV/
 *.swo
 
 # Voice Typing App Specific
-# NOTE: gitignore does not support inline comments — each rule must be
+# NOTE: gitignore does not support inline comments: each rule must be
 # on its own line, with any comment on a separate line above it.
 
-# Contains API keys — never commit
+# Contains API keys: never commit
 settings.json
 
-# Personal dictionary — never publish user vocabulary
+# Personal dictionary: never publish user vocabulary
 lexicon.txt
 
 # Personal exact-correction rules

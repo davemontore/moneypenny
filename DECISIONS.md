@@ -4,7 +4,7 @@ Significant project decisions, with date, reason, and practical consequence.
 
 ---
 
-## 2026-08-25 — Common punctuation commands must not depend on a cleanup model
+## 2026-08-25: Common punctuation commands must not depend on a cleanup model
 
 **Decision:** Parse paired quotes and common verbal punctuation locally before
 the optional contextual cleanup pass. Preserve explicit literal forms such as
@@ -28,7 +28,7 @@ https://console.groq.com/docs/models
 
 ---
 
-## 2026-08-13 — One universal line break; never type bare Enter
+## 2026-08-13: One universal line break; never type bare Enter
 
 **Decision:** `new line`, `newline`, and `new paragraph` all produce the same
 soft line break typed as Shift+Enter. MoneyPenny never types a bare Enter. Say
@@ -40,13 +40,13 @@ Fast cleanup models are also inconsistent about emitting one newline versus
 two, so code must enforce the exact mechanics.
 
 **Practical consequence:** Documents receive soft breaks rather than true
-paragraph marks—an acceptable trade for one composable command that cannot
+paragraph marks, an acceptable trade for one composable command that cannot
 accidentally send a message. Local parsing handles routine commands; contextual
 cleanup only resolves remaining ambiguity.
 
 ---
 
-## 2026-08-12 — Context-aware cleanup replaces punctuation heuristics
+## 2026-08-12: Context-aware cleanup replaces punctuation heuristics
 
 **Decision:** Raw speech recognition is followed by a selective Groq `llama-3.1-8b-instant` cleanup pass. Commands-only mode is the default: ordinary dictation returns immediately, while transcripts containing likely verbal punctuation receive contextual cleanup. Off and Always modes remain available. The cleaner returns the raw transcript unchanged when its call fails.
 
@@ -60,7 +60,7 @@ Sources: https://github.com/zachlatta/freeflow and https://github.com/jgvilchezc
 
 ---
 
-## 2026-08-12 — Ship a branded Windows executable for taskbar identity
+## 2026-08-12: Ship a branded Windows executable for taskbar identity
 
 **Decision:** Build a windowed on-folder `MoneyPenny.exe` with the project icon embedded and target that executable from the Start Menu and pinned taskbar shortcuts. The executable receives the same `MoneyPenny.VoiceTyping` AppUserModelID as its shortcuts and receives the project folder through `--app-dir`, preserving existing settings, lexicon, history, and logs.
 
@@ -72,7 +72,7 @@ Tagged versions are also built on GitHub's Windows runner and published as `Mone
 
 ---
 
-## 2026-08-09 — Installation is isolated and user data stays local
+## 2026-08-09: Installation is isolated and user data stays local
 
 **Decision:** MoneyPenny now installs tested component versions into a private `.venv` folder through `Install MoneyPenny.bat`. Both launchers use that environment. `settings.json` and `lexicon.txt` are local user data and are excluded from Git; a public `lexicon.example.txt` provides a safe starter.
 
@@ -84,19 +84,19 @@ Tagged versions are also built on GitHub's Windows runner and published as `Mone
 
 ---
 
-## 2026-08-08 — Groq added as a cloud transcription provider (CORRECTED)
+## 2026-08-08: Groq added as a cloud transcription provider (CORRECTED)
 
 **Decision:** Groq was added to MoneyPenny as a cloud provider option alongside OpenRouter, using the `whisper-large-v3-turbo` model.
 
-**Reason:** Initially this same day, Groq appeared to be geo-blocked from Thailand (website access denied in one browser) and was ruled out. That turned out to be wrong — Dave accessed console.groq.com in a different browser and obtained an API key. Groq's speed-focused infrastructure makes it the best candidate to close the gap with Wispr Flow.
+**Reason:** Initially this same day, Groq appeared to be geo-blocked from Thailand (website access denied in one browser) and was ruled out. That turned out to be wrong, Dave accessed console.groq.com in a different browser and obtained an API key. Groq's speed-focused infrastructure makes it the best candidate to close the gap with Wispr Flow.
 
 **Alternatives considered:** Staying on OpenRouter only (works, ~1.2–2.4s per dictation); Deepgram or AssemblyAI (not needed if Groq performs).
 
-**Practical consequence:** Settings now has a Cloud Provider selector (Groq / OpenRouter), separate API key fields for each, and a Groq model field. Both providers remain available; switching is one click. Lesson: a website failing in one browser is not proof of a geo-block — test another browser before ruling out a service.
+**Practical consequence:** Settings now has a Cloud Provider selector (Groq / OpenRouter), separate API key fields for each, and a Groq model field. Both providers remain available; switching is one click. Lesson: a website failing in one browser is not proof of a geo-block, test another browser before ruling out a service.
 
 ---
 
-## 2026-08-08 — Cloud transcription via OpenRouter (completed)
+## 2026-08-08: Cloud transcription via OpenRouter (completed)
 
 **Decision:** MoneyPenny transcribes through OpenRouter using the `openai/gpt-transcribe` model when Cloud mode is selected in Settings.
 

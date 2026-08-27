@@ -280,7 +280,7 @@ class MoneyPennyGUI:
 
         ctk.CTkLabel(
             container,
-            text="Free key from console.groq.com — starts with gsk_",
+            text="Free key from console.groq.com, starts with gsk_",
             font=ctk.CTkFont(family="Segoe UI", size=11),
             text_color="#888888",
             wraplength=400,

@@ -2,7 +2,7 @@
 
 ## Trigger
 
-When the user says something like **"let's close out the session for the day"** (also: "wrap up for the day", "end-of-day closeout", "close it out"), run this entire checklist in order before saying goodbye. Verify every step against the actual machine state — never report a step as done unless it was actually checked.
+When the user says something like **"let's close out the session for the day"** (also: "wrap up for the day", "end-of-day closeout", "close it out"), run this entire checklist in order before saying goodbye. Verify every step against the actual machine state, never report a step as done unless it was actually checked.
 
 ## 1. App matches the code
 
@@ -13,15 +13,15 @@ When the user says something like **"let's close out the session for the day"** 
 
 ## 2. Tests and logs
 
-- [ ] `.venv\Scripts\python.exe -m unittest discover -s tests` — all tests pass (pytest is not required).
+- [ ] `.venv\Scripts\python.exe -m unittest discover -s tests`, all tests pass (pytest is not required).
 - [ ] Scan `logs\moneypenny.log` for ERROR/WARNING lines from this session; address each one or explain why it is harmless.
 
 ## 3. Documentation
 
-- [ ] `CHANGELOG.md` — a version entry exists covering every behavior change made this session.
-- [ ] `README.md` and `QuickStart-CheatSheet.md` — user-visible behavior described accurately (commands, hotkeys, versions).
-- [ ] `DECISIONS.md` — significant decisions recorded with date, decision, reason, practical consequence.
-- [ ] `LESSONS_LEARNED.md` — reusable lessons recorded, newest first.
+- [ ] `CHANGELOG.md`, a version entry exists covering every behavior change made this session.
+- [ ] `README.md` and `QuickStart-CheatSheet.md`, user-visible behavior described accurately (commands, hotkeys, versions).
+- [ ] `DECISIONS.md`, significant decisions recorded with date, decision, reason, practical consequence.
+- [ ] `LESSONS_LEARNED.md`, reusable lessons recorded, newest first.
 - [ ] The command reference shown in the Dictionary tab (`gui.py`) matches the actual command behavior.
 
 ## 4. Safety
@@ -32,7 +32,7 @@ When the user says something like **"let's close out the session for the day"** 
 
 - [ ] Commit all changes with a clear message (never commit user data or API keys).
 - [ ] Push the branch to origin.
-- [ ] If `CHANGELOG.md` carries a new version header, tag it (`vX.Y.Z` style) and push the tag — this triggers the GitHub Actions release build that publishes `MoneyPenny-Windows-x64.zip`.
+- [ ] If `CHANGELOG.md` carries a new version header, tag it (`vX.Y.Z` style) and push the tag, this triggers the GitHub Actions release build that publishes `MoneyPenny-Windows-x64.zip`.
 - [ ] If the `gh` CLI is available, confirm the workflow run started (`gh run list --limit 1`).
 
 ## 6. Report

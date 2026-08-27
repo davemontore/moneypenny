@@ -31,7 +31,7 @@ suite and live dictation checklist pass.
 
 ## Phases
 
-### Phase 1 — Correction foundation
+### Phase 1: Correction foundation
 
 - [x] Add a persistent exact-correction store separate from preferred vocabulary.
 - [x] Match longer phrases first, case-insensitively, on whole-word boundaries.
@@ -41,7 +41,7 @@ suite and live dictation checklist pass.
 - [x] Add GUI fields for **Heard as** → **Type as** rules.
 - [x] Add import-safe example corrections without publishing personal entries.
 
-### Phase 2 — Local spoken-command parser
+### Phase 2: Local spoken-command parser
 
 - [x] Define protected literal forms: `the word colon`, `say colon`, and equivalents.
 - [x] Parse unambiguous single commands locally: comma, period, question mark,
@@ -55,7 +55,7 @@ The correction-recognition proposal has been scoped separately in
 feasible; arbitrary edits across every Windows application are not reliably
 observable from global key events alone.
 
-### Phase 3 — Ambiguity routing
+### Phase 3: Ambiguity routing
 
 - [ ] Detect collisions between command vocabulary and personal vocabulary
       (`colon` / `Colin`) without globally replacing either word.
@@ -63,7 +63,7 @@ observable from global key events alone.
 - [ ] Invoke the resolver only when deterministic rules cannot decide safely.
 - [ ] Record why an ambiguity call was made and how long it took.
 
-### Phase 4 — Latency work
+### Phase 4: Latency work
 
 - [ ] Reuse persistent HTTP connections for transcription and optional cleanup.
 - [ ] Record capture-finalization, upload/transcription, local-correction,
@@ -72,7 +72,7 @@ observable from global key events alone.
       fast path is stable.
 - [ ] Keep ordinary cloud dictation at or below the 0.87-second baseline average.
 
-### Phase 5 — Release candidate
+### Phase 5: Release candidate
 
 - [ ] Run unit, syntax, dependency, packaging, and secret checks.
 - [x] Build a private Windows release candidate.
@@ -102,7 +102,7 @@ Also verify that no final text contains punctuation collisions such as `:.`,
 
 ## Session log
 
-### 2026-08-25 — Local punctuation and quote repair
+### 2026-08-25: Local punctuation and quote repair
 
 - Fresh history reproduced `quote ... end quote` leaking into final text.
 - The log identified Groq HTTP 404 for the retired
@@ -119,7 +119,7 @@ Also verify that no final text contains punctuation collisions such as `:.`,
 - Automated verification: 27 tests pass, syntax compilation passes, the frozen
   build succeeds, and the installed executable hash matches candidate 3.
 
-### 2026-08-25 — Correction-recognition trial
+### 2026-08-25: Correction-recognition trial
 
 - Implemented the constrained 10-second Backspace-and-retype detector described
   in `CORRECTION_LEARNING_SCOPE.md`.
@@ -138,7 +138,7 @@ Also verify that no final text contains punctuation collisions such as `:.`,
 - The user explicitly approved pushing, merging, and publishing the completed
   update on 2026-08-25 after reviewing the live behavior.
 
-### 2026-08-12 — Plan created
+### 2026-08-12: Plan created
 
 - Release converted to draft; repository and tag preserved.
 - Root cause confirmed: MoneyPenny has vocabulary biasing but no exact correction rules.
@@ -153,7 +153,7 @@ Also verify that no final text contains punctuation collisions such as `:.`,
   used no cleanup request, and matched the speaker's wording accurately.
 - User feedback at pause: accuracy is good and transcription feels very fast.
 
-## Pause checkpoint — resume here
+## Pause checkpoint: resume here
 
 Repository state:
 
