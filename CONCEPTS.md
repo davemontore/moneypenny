@@ -10,7 +10,9 @@ The ordered transformation from recognized speech to emitted text, with locally 
 ### Insertion context
 Text immediately before the active caret, inspected without changing the editor or clipboard, that determines whether dictated text needs a separator and whether its first word continues an unfinished sentence.
 
-When Insertion context is unavailable, secure, unstable, or too slow to read safely, the Transcript pipeline preserves its legacy spacing and capitalization behavior instead of guessing.
+When Insertion context is unavailable, secure, unstable, or too slow to read safely, the Transcript pipeline preserves capitalization but does not invent leading whitespace.
+
+Insertion context is currently disabled in release builds because browser message fields can expose surrounding application text instead of only the editable field. Release builds therefore preserve transcription capitalization and add no inferred separator until target-aware validation is available.
 
 ### Preferred vocabulary
 A private set of terms supplied to transcription as recognition hints; it can improve recognition but does not guarantee the final spelling, capitalization, or symbols.
@@ -31,7 +33,7 @@ An unambiguous phrase whose intended punctuation, quotation, delimiter, or line-
 An optional model-assisted transcript stage normally used for ambiguity that bounded local rules cannot safely resolve, with a user-selectable mode that can apply it to every transcript; failure preserves the already locally processed transcript.
 
 ### Soft break
-The single safe line-break behavior used by every spoken line-break command, designed to insert layout without invoking a control's submit action; repeating the command composes a blank line.
+A safe Shift+Enter line break that inserts layout without invoking a control's submit action. `new line` emits one Soft break, while `new paragraph` emits two to leave a blank line between paragraphs.
 
 ## Desktop lifecycle
 

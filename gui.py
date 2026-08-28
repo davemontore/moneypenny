@@ -7,6 +7,7 @@ import customtkinter as ctk
 from tkinter import messagebox
 import tkinter as tk
 import threading
+import os
 from pathlib import Path
 from PIL import Image, ImageDraw
 import pystray
@@ -247,19 +248,30 @@ class MoneyPennyGUI:
 
         ctk.CTkLabel(
             container,
-            text="Groq is usually the fastest. OpenRouter routes to other providers (e.g. OpenAI).",
+            text=(
+                "Groq is usually the fastest. Deepgram Nova-3 understands spoken "
+                "dictation commands. OpenRouter routes to other providers."
+            ),
             font=ctk.CTkFont(family="Segoe UI", size=11),
             text_color="#888888",
             wraplength=400,
             justify="left",
         ).pack(anchor="w", padx=5)
 
+        provider_labels = {
+            "groq": "Groq",
+            "openrouter": "OpenRouter",
+            "deepgram": "Deepgram",
+        }
         self.provider_var = ctk.StringVar(
-            value=self.app.settings.get("cloud_provider", "openrouter").capitalize()
+            value=provider_labels.get(
+                self.app.settings.get("cloud_provider", "groq"),
+                "Groq",
+            )
         )
         provider_btn = ctk.CTkSegmentedButton(
             container,
-            values=["Groq", "OpenRouter"],
+            values=["Groq", "OpenRouter", "Deepgram"],
             variable=self.provider_var,
             fg_color=BUTTON_COLOR,
             selected_color=ACCENT_COLOR,
@@ -330,6 +342,86 @@ class MoneyPennyGUI:
             width=330,
         )
         groq_model_entry.pack(anchor="w", padx=5, pady=(5, 12))
+
+        # --- Deepgram API key ---
+        ctk.CTkLabel(
+            container,
+            text="Deepgram API Key (used when Provider = Deepgram)",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            text_color=TEXT_COLOR,
+        ).pack(anchor="w", padx=5, pady=(5, 0))
+
+        ctk.CTkLabel(
+            container,
+            text="Nova-3 dictation recognizes commands such as period, colon, new line, and new paragraph.",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color="#888888",
+            wraplength=500,
+            justify="left",
+        ).pack(anchor="w", padx=5)
+
+        self.deepgram_apikey_var = ctk.StringVar(
+            value=self.app.settings.get("deepgram_api_key", "")
+        )
+        self.deepgram_apikey_entry = ctk.CTkEntry(
+            container,
+            textvariable=self.deepgram_apikey_var,
+            placeholder_text="Deepgram API key",
+            show="•",
+            fg_color=BG_COLOR,
+            border_color=BUTTON_COLOR,
+            text_color=TEXT_COLOR,
+            width=330,
+        )
+        self.deepgram_apikey_entry.pack(anchor="w", padx=5, pady=(5, 12))
+
+        self.deepgram_model_var = ctk.StringVar(
+            value=self.app.settings.get("deepgram_model", "nova-3")
+        )
+        deepgram_model_entry = ctk.CTkEntry(
+            container,
+            textvariable=self.deepgram_model_var,
+            placeholder_text="nova-3",
+            fg_color=BG_COLOR,
+            border_color=BUTTON_COLOR,
+            text_color=TEXT_COLOR,
+            width=330,
+        )
+        deepgram_model_entry.pack(anchor="w", padx=5, pady=(0, 12))
+
+        self.punctuation_lab_var = ctk.BooleanVar(
+            value=self.app.settings.get("punctuation_lab_enabled", False)
+        )
+        punctuation_lab = ctk.CTkCheckBox(
+            container,
+            text="Punctuation Lab: compare configured cloud engines",
+            variable=self.punctuation_lab_var,
+            onvalue=True,
+            offvalue=False,
+            fg_color=ACCENT_COLOR,
+            text_color=TEXT_COLOR,
+        )
+        punctuation_lab.pack(anchor="w", padx=5, pady=(0, 3))
+        ctk.CTkLabel(
+            container,
+            text=(
+                "Testing only. Each hotkey recording is saved locally and sent to every "
+                "configured cloud engine. Results are saved, and nothing is typed."
+            ),
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color="#888888",
+            wraplength=500,
+            justify="left",
+        ).pack(anchor="w", padx=5, pady=(0, 12))
+        ctk.CTkButton(
+            container,
+            text="Open Punctuation Lab Folder",
+            command=self._open_punctuation_lab_folder,
+            fg_color=BUTTON_COLOR,
+            hover_color=BUTTON_HOVER,
+            text_color=TEXT_COLOR,
+            width=230,
+        ).pack(anchor="w", padx=5, pady=(0, 12))
 
         # --- Context-aware cleanup ---
         ctk.CTkLabel(
@@ -750,7 +842,8 @@ class MoneyPennyGUI:
             "quote ... end quote / open quote ... close quote  Wrap words in quotation marks\n"
             "comma / period / question mark                  ,  .  ?\n"
             "exclamation point / colon / semicolon           !  :  ;\n"
-            "new line / new paragraph                        Soft break (Shift+Enter; twice = blank line)\n"
+            "new line                                        One safe line break (Shift+Enter)\n"
+            "new paragraph                                   Two safe line breaks (blank line)\n"
             "open parenthesis / close parenthesis            (  )\n"
             "slash / backslash                               /  \\\n"
             "the word comma / a comma                        Keep punctuation terms as words"
@@ -1014,6 +1107,17 @@ class MoneyPennyGUI:
         self.window.clipboard_append(entries[-1].get("final", ""))
         self._log_activity("Copied latest transcript")
 
+    def _open_punctuation_lab_folder(self):
+        path = self.app.punctuation_lab.output_dir
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+            os.startfile(path)
+        except Exception as exc:
+            messagebox.showerror(
+                "MoneyPenny",
+                f"Could not open the Punctuation Lab folder.\n\n{exc}",
+            )
+
     def _clear_history(self):
         if not messagebox.askyesno(
             "MoneyPenny",
@@ -1031,12 +1135,24 @@ class MoneyPennyGUI:
         self.app.settings.set("transcription_mode", new_mode)
 
         # Cloud provider + keys + models
-        new_provider = self.provider_var.get().lower()  # "groq" or "openrouter"
+        new_provider = self.provider_var.get().lower()
         self.app.settings.set("cloud_provider", new_provider)
         self.app.settings.set("openrouter_api_key", self.apikey_var.get().strip())
         self.app.settings.set("cloud_model", self.cloud_model_var.get())
         self.app.settings.set("groq_api_key", self.groq_apikey_var.get().strip())
         self.app.settings.set("groq_model", self.groq_model_var.get().strip() or "whisper-large-v3-turbo")
+        self.app.settings.set(
+            "deepgram_api_key",
+            self.deepgram_apikey_var.get().strip(),
+        )
+        self.app.settings.set(
+            "deepgram_model",
+            self.deepgram_model_var.get().strip() or "nova-3",
+        )
+        self.app.settings.set(
+            "punctuation_lab_enabled",
+            bool(self.punctuation_lab_var.get()),
+        )
         cleanup_modes = {
             "Off": "off",
             "Commands only": "commands",
@@ -1088,6 +1204,7 @@ class MoneyPennyGUI:
         active_key_missing = (
             (new_provider == "groq" and not self.groq_apikey_var.get().strip())
             or (new_provider == "openrouter" and not self.apikey_var.get().strip())
+            or (new_provider == "deepgram" and not self.deepgram_apikey_var.get().strip())
         )
         if new_mode == "cloud" and active_key_missing:
             messagebox.showwarning(

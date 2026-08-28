@@ -6,9 +6,11 @@ import requests
 from faster_whisper import WhisperModel
 from pynput.keyboard import Controller, Key
 import threading
+from concurrent.futures import ThreadPoolExecutor
 import time
 import io
 import wave
+import shutil
 import os
 import logging
 from logging.handlers import RotatingFileHandler
@@ -68,6 +70,7 @@ SETTINGS_FILE = APP_DIR / "settings.json"
 LEXICON_FILE = APP_DIR / "lexicon.txt"
 CORRECTIONS_FILE = APP_DIR / "corrections.json"
 HISTORY_FILE = APP_DIR / "transcript_history.jsonl"
+PUNCTUATION_LAB_DIR = APP_DIR / "punctuation_lab"
 SINGLE_INSTANCE_MUTEX_NAME = "Global\\MoneyPennyVoiceTypingMutex"
 ACTIVATE_WINDOW_EVENT_NAME = "Global\\MoneyPennyActivateWindowEvent"
 MAIN_WINDOW_TITLE = "MoneyPenny Voice Typing"
@@ -275,11 +278,14 @@ DEFAULT_SETTINGS = {
     "transcription_mode": "local",  # "local" (offline, CPU) or "cloud" (API)
     "model_size": "tiny.en",
     "beam_size": 1,
-    "cloud_provider": "groq",  # "groq" (fastest) or "openrouter"
+    "cloud_provider": "groq",  # "groq", "openrouter", or "deepgram"
     "openrouter_api_key": "",
     "cloud_model": "openai/gpt-transcribe",
     "groq_api_key": "",
     "groq_model": "whisper-large-v3-turbo",
+    "deepgram_api_key": "",
+    "deepgram_model": "nova-3",
+    "punctuation_lab_enabled": False,
     "cleanup_mode": "commands",  # "off", "commands", or "always"
     "cleanup_model": "openai/gpt-oss-20b",
     "correction_recognition_enabled": True,
@@ -819,6 +825,10 @@ def normalize_punctuation_collisions(text: str) -> str:
     # A colon or semicolon spoken at the end of a sentence supersedes the
     # automatic punctuation supplied by the speech model (":." -> ":").
     text = re.sub(r"([:;])[.,](?=\s|$|[\"”’\)\]])", r"\1", text)
+    # Speech recognition can also place its automatic mark before the spoken
+    # command (", colon." -> ", colon" -> ",:"), so resolve that direction.
+    text = re.sub(r",([:;])", r"\1", text)
+    text = re.sub(r"(?<!\.)\.([:;])", r"\1", text)
     # Terminal punctuation supersedes a comma inserted beside it (",." -> ".").
     text = re.sub(r",([!?])", r"\1", text)
     text = re.sub(r",\.(?!\.)", ".", text)
@@ -835,12 +845,15 @@ _QUOTE_PAIRED_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+_LINE_BREAK_COMMANDS = (
+    # Both commands are soft breaks. A paragraph includes a blank line without
+    # ever sending a bare Enter to a chat-style text box.
+    ("new paragraph", "\n\n"),
+    ("new line", "\n"),
+    ("newline", "\n"),
+)
 _SPOKEN_COMMANDS = {
-    # Both commands are soft breaks. Saying either command twice creates a
-    # blank line without ever sending a chat-style text box.
-    "new paragraph": "\n",
-    "new line": "\n",
-    "newline": "\n",
+    **dict(_LINE_BREAK_COMMANDS),
     "open parenthesis": "(",
     "open parentheses": "(",
     "close parenthesis": ")",
@@ -857,7 +870,7 @@ _SPOKEN_COMMANDS = {
     "slash": "/",
 }
 _SPOKEN_COMMAND_PATTERN = re.compile(
-    r"(?<!\w)(?:"
+    r"(?<!\w)(?P<command>"
     + "|".join(
         sorted(
             (re.escape(command) for command in _SPOKEN_COMMANDS),
@@ -865,13 +878,14 @@ _SPOKEN_COMMAND_PATTERN = re.compile(
             reverse=True,
         )
     )
-    + r")(?!\w)",
+    + r")(?!\w)(?:[,.;:!?])?",
     re.IGNORECASE,
 )
 _LITERAL_PRECEDING_WORDS = {
-    "a", "an", "the", "word", "term", "phrase", "command", "symbol",
+    "a", "an", "the", "word", "words", "term", "phrase", "command", "symbol",
     "say", "saying", "said", "called", "named", "spell", "spelled",
     "type", "typed", "write", "written", "use", "using", "mention",
+    "hit", "press",
 }
 _LITERAL_FOLLOWING_WORDS = {
     "word", "term", "phrase", "command", "symbol", "punctuation",
@@ -907,7 +921,7 @@ def _normalize_spoken_command_spacing(text: str) -> str:
     text = re.sub(r"[ \t]*\n[ \t]*", "\n", text)
     # A terminal command spoken after a closing quote belongs inside it.
     text = re.sub(r'"([,.!?])', r'\1"', text)
-    return text.strip()
+    return text.strip(" \t")
 
 
 def apply_spoken_punctuation(text: str) -> tuple[str, list]:
@@ -935,9 +949,10 @@ def apply_spoken_punctuation(text: str) -> tuple[str, list]:
     def replace_command(match):
         if _is_literal_punctuation_reference(text, match.start(), match.end()):
             return match.group(0)
-        command = " ".join(match.group(0).casefold().split())
+        spoken_command = match.group("command")
+        command = " ".join(spoken_command.casefold().split())
         written = _SPOKEN_COMMANDS[command]
-        applied.append({"command": match.group(0), "written": written})
+        applied.append({"command": spoken_command, "written": written})
         return written
 
     text = _SPOKEN_COMMAND_PATTERN.sub(replace_command, text)
@@ -945,6 +960,16 @@ def apply_spoken_punctuation(text: str) -> tuple[str, list]:
         text = _normalize_spoken_command_spacing(text)
         text = normalize_punctuation_collisions(text)
     return text, applied
+
+
+def format_transcript_for_provider(text: str, provider: str) -> tuple[str, list]:
+    """Apply only the punctuation layer appropriate for the STT provider."""
+    if provider == "deepgram":
+        return normalize_punctuation_collisions(text), []
+    formatted, commands = apply_spoken_punctuation(text)
+    if commands:
+        return formatted, commands
+    return normalize_punctuation_collisions(formatted), commands
 
 
 class TranscriptHistory:
@@ -1023,7 +1048,7 @@ Interpret spoken punctuation from context:
 - Convert punctuation words only when the speaker uses them as commands.
 - Preserve them as words when the speaker discusses them, such as "the word comma", "a comma", or "punctuation command comma".
 - Paired "quote ... quote", "open quote ... close quote", and "open quote ... end quote" create quotation marks around only the intended words. "end quote" means exactly the same as "close quote". Leave no space between a quotation mark and the words it wraps.
-- "new line" and "new paragraph" used as commands insert exactly one newline character. Saying either command twice creates a blank line.
+- "new line" inserts one newline character. "new paragraph" inserts two newline characters so there is a blank line between paragraphs.
 - Commas and periods go inside a closing quotation mark: write "hello," and "hello." — never "hello", or "hello".
 - Resolve punctuation that speech recognition inserted beside a spoken command; never emit collisions such as `,:,`, doubled punctuation, or `\",.`.
 - Commands include comma, period, question mark, exclamation point, colon, semicolon, new line, new paragraph, open/close parenthesis, slash, backslash, and quote.
@@ -1070,11 +1095,7 @@ If the transcript is empty or only filler, return exactly EMPTY."""
         "apostrophe",
     )
 
-    _EDGE_BREAKS = (
-        ("new paragraph", "\n"),
-        ("new line", "\n"),
-        ("newline", "\n"),
-    )
+    _EDGE_BREAKS = _LINE_BREAK_COMMANDS
 
     def should_clean(self, transcript: str) -> bool:
         """Use the second API call only when the selected mode requires it."""
@@ -1143,8 +1164,8 @@ If the transcript is empty or only filler, return exactly EMPTY."""
         return "".join(chars)
 
     def _normalize_model_breaks(self, cleaned: str) -> str:
-        """Collapse model newline clusters into single safe soft breaks."""
-        return re.sub(r"\n+", "\n", cleaned)
+        """Cap model newline clusters at one blank line."""
+        return re.sub(r"\n{3,}", "\n\n", cleaned)
 
     def clean(self, transcript: str) -> tuple[str, bool]:
         """Return (text, cleanup_used), falling back to raw text on failure."""
@@ -1332,8 +1353,18 @@ class Transcriber:
             return ""
 
     def _transcribe_cloud(self, wav_buffer: io.BytesIO) -> str:
-        """Transcribe via the configured cloud provider (Groq or OpenRouter)."""
+        """Transcribe via the configured cloud provider."""
         provider = self.settings.get("cloud_provider", "openrouter")
+
+        return self.transcribe_cloud_candidate(wav_buffer, provider)
+
+    def transcribe_cloud_candidate(
+        self,
+        wav_buffer: io.BytesIO,
+        provider: str,
+        model: str | None = None,
+    ) -> str:
+        """Transcribe one WAV through an explicitly selected cloud candidate."""
 
         if provider == "groq":
             api_key = (self.settings.get("groq_api_key") or "").strip()
@@ -1345,9 +1376,23 @@ class Transcriber:
                 wav_buffer,
                 url="https://api.groq.com/openai/v1/audio/transcriptions",
                 api_key=api_key,
-                model=self.settings.get("groq_model", "whisper-large-v3-turbo"),
+                model=model or self.settings.get("groq_model", "whisper-large-v3-turbo"),
                 extra_headers={},
                 provider_name="Groq",
+            )
+
+        if provider == "deepgram":
+            api_key = (self.settings.get("deepgram_api_key") or "").strip()
+            if not api_key:
+                self.last_error = (
+                    "Add a Deepgram API key in Settings or switch to Local mode."
+                )
+                logger.error("Cloud mode is on (Deepgram) but no Deepgram API key is set.")
+                return ""
+            return self._deepgram_request(
+                wav_buffer,
+                api_key=api_key,
+                model=model or self.settings.get("deepgram_model", "nova-3"),
             )
 
         # Default: OpenRouter
@@ -1360,13 +1405,56 @@ class Transcriber:
             wav_buffer,
             url="https://openrouter.ai/api/v1/audio/transcriptions",
             api_key=api_key,
-            model=self.settings.get("cloud_model", "openai/gpt-transcribe"),
+            model=model or self.settings.get("cloud_model", "openai/gpt-transcribe"),
             extra_headers={
                 # Optional attribution headers OpenRouter recommends.
                 "HTTP-Referer": "https://github.com/davemontore/moneypenny",
                 "X-Title": "MoneyPenny Voice Typing",
             },
             provider_name="OpenRouter",
+        )
+
+    def _deepgram_request(
+        self,
+        wav_buffer: io.BytesIO,
+        api_key: str,
+        model: str,
+    ) -> str:
+        """Send WAV audio to Deepgram with its native dictation commands."""
+        params = {
+            "model": model,
+            "language": "en-US",
+            "dictation": "true",
+            "punctuate": "true",
+            "smart_format": "true",
+        }
+        keyterms = getattr(self.lexicon, "terms", None)
+        if isinstance(keyterms, list) and keyterms:
+            params["keyterm"] = keyterms[:50]
+        headers = {
+            "Authorization": f"Token {api_key}",
+            "Content-Type": "audio/wav",
+        }
+
+        def send_request():
+            wav_buffer.seek(0)
+            return requests.post(
+                "https://api.deepgram.com/v1/listen",
+                headers=headers,
+                params=params,
+                data=wav_buffer,
+                timeout=30,
+            )
+
+        def extract_transcript(resp):
+            channels = resp.json().get("results", {}).get("channels", [])
+            alternatives = channels[0].get("alternatives", []) if channels else []
+            return alternatives[0].get("transcript", "").strip() if alternatives else ""
+
+        return self._request_with_retry(
+            provider_name="Deepgram",
+            send_request=send_request,
+            extract_transcript=extract_transcript,
         )
 
     def _cloud_request(
@@ -1391,15 +1479,32 @@ class Transcriber:
         if prompt:
             data["prompt"] = prompt
 
-        for attempt in (1, 2):
+        def send_request():
             wav_buffer.seek(0)
             files = {"file": ("audio.wav", wav_buffer, "audio/wav")}
+            return requests.post(
+                url, headers=headers, files=files, data=data, timeout=30
+            )
+
+        return self._request_with_retry(
+            provider_name=provider_name,
+            send_request=send_request,
+            extract_transcript=lambda resp: resp.json().get("text", "").strip(),
+        )
+
+    def _request_with_retry(
+        self,
+        provider_name: str,
+        send_request,
+        extract_transcript,
+    ) -> str:
+        """Run the common two-attempt cloud response and error policy."""
+        for attempt in (1, 2):
+            retry_delay = 0.8
             try:
-                resp = requests.post(
-                    url, headers=headers, files=files, data=data, timeout=30
-                )
+                resp = send_request()
                 if resp.status_code == 200:
-                    return resp.json().get("text", "").strip()
+                    return extract_transcript(resp)
                 if resp.status_code in (401, 403):
                     self.last_error = (
                         f"{provider_name} rejected the API key. Check it in Settings."
@@ -1417,11 +1522,18 @@ class Transcriber:
                     resp.status_code,
                     resp.text[:300],
                 )
-                if resp.status_code < 500 or attempt == 2:
+                retryable = resp.status_code == 429 or resp.status_code >= 500
+                if not retryable or attempt == 2:
                     self.last_error = (
                         f"{provider_name} transcription failed (HTTP {resp.status_code})."
                     )
                     return ""
+                if resp.status_code == 429:
+                    try:
+                        retry_after = float(resp.headers.get("Retry-After", retry_delay))
+                        retry_delay = min(max(retry_after, 0.0), 3.0)
+                    except (TypeError, ValueError):
+                        pass
             except Exception:
                 logger.exception(
                     "Cloud transcription request failed (%s)", provider_name
@@ -1432,8 +1544,106 @@ class Transcriber:
                     )
                     return ""
             logger.info("%s request failed; retrying once...", provider_name)
-            time.sleep(0.8)
+            time.sleep(retry_delay)
         return ""
+
+
+class PunctuationLab:
+    """Compare configured transcription engines against one saved WAV."""
+
+    def __init__(
+        self,
+        settings: Settings,
+        transcriber: Transcriber,
+        output_dir: Path = PUNCTUATION_LAB_DIR,
+    ):
+        self.settings = settings
+        self.transcriber = transcriber
+        self.output_dir = output_dir
+
+    def _candidates(self):
+        groq_key = (self.settings.get("groq_api_key") or "").strip()
+        if groq_key:
+            for model in ("whisper-large-v3-turbo", "whisper-large-v3"):
+                yield "groq", model
+
+        openrouter_key = (self.settings.get("openrouter_api_key") or "").strip()
+        if openrouter_key:
+            model = self.settings.get("cloud_model", "openai/gpt-transcribe")
+            yield "openrouter", model
+
+        deepgram_key = (self.settings.get("deepgram_api_key") or "").strip()
+        if deepgram_key:
+            model = self.settings.get("deepgram_model", "nova-3")
+            yield "deepgram", model
+
+    def _run_candidate(self, wav_bytes: bytes, candidate: tuple[str, str]) -> dict:
+        provider, model = candidate
+        transcriber = Transcriber(self.settings, self.transcriber.lexicon)
+        started = time.perf_counter()
+        raw = transcriber.transcribe_cloud_candidate(
+            io.BytesIO(wav_bytes),
+            provider,
+            model,
+        )
+        elapsed = time.perf_counter() - started
+        formatted = raw
+        applied_commands = []
+        if raw:
+            formatted, applied_commands = format_transcript_for_provider(
+                raw,
+                provider,
+            )
+        return {
+            "provider": provider,
+            "model": model,
+            "raw": raw,
+            "formatted": formatted,
+            "commands": applied_commands,
+            "elapsed_seconds": round(elapsed, 3),
+            "error": transcriber.last_error,
+        }
+
+    def run(self, wav_buffer: io.BytesIO) -> dict:
+        """Persist the audio and provider results without typing any output."""
+        run_id = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        created_at = datetime.now().astimezone().isoformat(timespec="seconds")
+        candidates = list(self._candidates())
+        if not candidates:
+            return {
+                "run_id": run_id,
+                "created_at": created_at,
+                "audio_file": None,
+                "candidates": [],
+            }
+
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        audio_name = f"audio/{run_id}.wav"
+        audio_path = self.output_dir / audio_name
+        audio_path.parent.mkdir(parents=True, exist_ok=True)
+        wav_buffer.seek(0)
+        with open(audio_path, "wb") as audio_file:
+            shutil.copyfileobj(wav_buffer, audio_file)
+
+        wav_buffer.seek(0)
+        wav_bytes = wav_buffer.read()
+        with ThreadPoolExecutor(max_workers=min(4, len(candidates) or 1)) as executor:
+            results = list(
+                executor.map(
+                    lambda candidate: self._run_candidate(wav_bytes, candidate),
+                    candidates,
+                )
+            )
+
+        report = {
+            "run_id": run_id,
+            "created_at": created_at,
+            "audio_file": audio_name,
+            "candidates": results,
+        }
+        with open(self.output_dir / "results.jsonl", "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(report, ensure_ascii=False) + "\n")
+        return report
 
 
 def type_text_with_breaks(controller, text: str):
@@ -1455,10 +1665,13 @@ def _read_text_before_caret(max_chars: int) -> str | None:
 
 
 _caret_context_probe = CaretContextProbe(_read_text_before_caret)
+CARET_CONTEXT_ENABLED = False
 
 
 def _get_text_before_caret(max_chars: int = 256) -> str | None:
-    """Read caret context within a bounded, capacity-one background probe."""
+    """Return verified caret context, or preserve transcription when disabled."""
+    if not CARET_CONTEXT_ENABLED:
+        return None
     return _caret_context_probe.read(max_chars=max_chars)
 
 
@@ -1471,6 +1684,7 @@ class MoneyPennyApp:
         self.lexicon = Lexicon()
         self.corrections = ExactCorrections()
         self.transcriber = Transcriber(self.settings, self.lexicon)
+        self.punctuation_lab = PunctuationLab(self.settings, self.transcriber)
         self.cleaner = TranscriptCleaner(self.settings)
         self.history = TranscriptHistory()
         self.correction_tracker = CorrectionTracker()
@@ -1598,11 +1812,45 @@ class MoneyPennyApp:
             self._notify_status("idle", "No audio recorded")
             return
 
+        if self.settings.get("punctuation_lab_enabled", False):
+            try:
+                wav_buffer = self.transcriber._frames_to_wav(frames)
+                report = self.punctuation_lab.run(wav_buffer)
+                candidate_count = len(report["candidates"])
+                if candidate_count:
+                    logger.info(
+                        "Punctuation Lab run %s saved %d comparisons",
+                        report["run_id"],
+                        candidate_count,
+                    )
+                    self._notify_status(
+                        "idle",
+                        f"Punctuation Lab saved {candidate_count} comparisons. Nothing was typed.",
+                    )
+                else:
+                    self._notify_status(
+                        "error",
+                        "Punctuation Lab needs at least one configured cloud API key.",
+                    )
+            except Exception:
+                logger.exception("Punctuation Lab run failed")
+                self._notify_status(
+                    "error",
+                    "Punctuation Lab failed. Check the Status tab or log for details.",
+                )
+            return
+
         start_time = time.time()
         text = self.transcriber.transcribe(frames)
         elapsed = time.time() - start_time
         raw_text = text
         cleanup_used = False
+        mode = self.settings.get("transcription_mode", "local")
+        provider = (
+            self.settings.get("cloud_provider", "local")
+            if mode == "cloud"
+            else "local"
+        )
 
         if text:
             logger.info("Raw transcript (%.2fs): %s", elapsed, text)
@@ -1614,14 +1862,19 @@ class MoneyPennyApp:
             )
             if applied_corrections:
                 logger.info("Applied exact corrections: %s", applied_corrections)
-            text, applied_commands = apply_spoken_punctuation(text)
+            text, applied_commands = format_transcript_for_provider(text, provider)
             if applied_commands:
                 logger.info("Applied local punctuation commands: %s", applied_commands)
-            if self.cleaner.should_clean(text):
-                self._notify_status("cleaning", "Applying context-aware cleanup...")
-            text, cleanup_used = self.cleaner.clean(text)
-            if self.cleaner.last_error:
-                logger.info(self.cleaner.last_error)
+            cleanup_allowed = not (
+                provider == "deepgram"
+                and self.settings.get("cleanup_mode", "commands") == "commands"
+            )
+            if cleanup_allowed:
+                if self.cleaner.should_clean(text):
+                    self._notify_status("cleaning", "Applying context-aware cleanup...")
+                text, cleanup_used = self.cleaner.clean(text)
+                if self.cleaner.last_error:
+                    logger.info(self.cleaner.last_error)
             text = self._strip_stock_phrases(text)
             text = normalize_punctuation_collisions(text)
         if text:
@@ -1639,9 +1892,6 @@ class MoneyPennyApp:
             )
 
             logger.info("Final transcript (%.2fs): %s", total_elapsed, text)
-            mode = self.settings.get("transcription_mode", "local")
-            provider = self.settings.get("cloud_provider", "local") if mode == "cloud" else "local"
-
             # Emit while the verified focus is still current. UI callbacks may
             # move focus, so history/status notifications follow typing.
             type_text_with_breaks(self.keyboard_controller, prefix + text)

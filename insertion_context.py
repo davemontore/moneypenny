@@ -77,14 +77,14 @@ def prepare_text_for_insertion(
     """Choose separator and capitalization from text immediately before the caret.
 
     ``preceding_text`` is ``None`` when the focused editor does not expose its
-    caret. In that case the legacy separator and capitalization are retained.
+    caret. In that case capitalization is retained and no separator is invented.
     ``protected_initial_texts`` carries deterministic corrections whose exact
     written form must survive continuation capitalization handling.
     """
     if text.startswith("\n"):
         return "", text
     if preceding_text is None:
-        return " ", text
+        return "", text
 
     prefix = "" if not preceding_text or preceding_text[-1].isspace() else " "
     if _is_sentence_start(preceding_text):

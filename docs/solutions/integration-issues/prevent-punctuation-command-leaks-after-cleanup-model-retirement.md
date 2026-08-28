@@ -26,7 +26,7 @@ Local Git history records the repair in commit `552a34b` and the subsequent merg
 
 - Saved known settings overwrite defaults during load, so changing only the default would leave an already-saved retired model active (`voice_to_text.py:292-307`).
 - Cleanup intentionally returns its input after HTTP errors, missing credentials, malformed responses, or unsafe expansion (`voice_to_text.py:1134-1150`, `voice_to_text.py:1179-1198`; `tests/test_transcript_pipeline.py:304-328`).
-- Before mechanical commands ran locally, that safe fallback also preserved spoken command tokens. The regression suite now requires `First comma second period new paragraph Is this right question mark` to become `First, second.\nIs this right?` (`tests/test_transcript_pipeline.py:216-222`).
+- Before mechanical commands ran locally, that safe fallback also preserved spoken command tokens. The regression suite now requires `First comma second period new paragraph Is this right question mark` to become `First, second.\n\nIs this right?`, with a blank line for the paragraph boundary (`tests/test_transcript_pipeline.py`).
 - A bare Enter can submit a chat-style control. The output tests require every transcript newline, including consecutive breaks, to be emitted with Shift held (`tests/test_transcript_pipeline.py:404-429`).
 
 ## What Didn't Work

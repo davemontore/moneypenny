@@ -20,5 +20,23 @@ class CorrectionDialogVisibilityTests(unittest.TestCase):
         self.assertIs(askyesno.call_args.kwargs["parent"], gui.window)
 
 
+class PunctuationLabFolderTests(unittest.TestCase):
+    def test_directory_creation_failure_shows_error(self):
+        gui = MoneyPennyGUI.__new__(MoneyPennyGUI)
+        output_dir = Mock()
+        output_dir.mkdir.side_effect = OSError("disk unavailable")
+        gui.app = Mock()
+        gui.app.punctuation_lab.output_dir = output_dir
+
+        with (
+            patch("gui.os.startfile") as startfile,
+            patch("gui.messagebox.showerror") as showerror,
+        ):
+            gui._open_punctuation_lab_folder()
+
+        startfile.assert_not_called()
+        showerror.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()

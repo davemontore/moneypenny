@@ -52,7 +52,12 @@ prefix, text = prepare_text_for_insertion(
 type_text_with_breaks(self.keyboard_controller, prefix + text)
 ```
 
-Known context reuses existing whitespace, adds exactly one separator when needed, preserves capitalization at document, line, and sentence boundaries, and lowercases only an ordinary title-cased first word in an unfinished sentence. Unknown context preserves the legacy leading-space and capitalization behavior.
+The context probe and deterministic insertion policy remain implemented and
+covered as a future target-aware capability. In the current release,
+`CARET_CONTEXT_ENABLED` is false because browser message fields exposed
+surrounding application text as if it were editor content. Runtime dictation
+therefore treats caret context as unknown, preserves transcription
+capitalization, and adds no inferred leading separator.
 
 Exact corrections applied to the first lexical token carry protection metadata into insertion preparation so their stored written form remains literal (`voice_to_text.py`, `tests/test_transcript_pipeline.py`). Typing and correction-recognition arming occur before history and status callbacks, reducing the window in which application UI work can steal focus.
 
@@ -60,11 +65,18 @@ The packaged Windows build explicitly lists the lazily imported `uiautomation` d
 
 ## Why This Works
 
-Capitalization becomes a property of the actual insertion point rather than the recording boundary. The policy remains deterministic and independently testable, while the editor integration is best-effort and bounded.
+When enabled for a verified target, capitalization becomes a property of the
+actual insertion point rather than the recording boundary. The policy remains
+deterministic and independently testable, while the editor integration is
+best-effort and bounded.
 
-The fallback prefers an occasional legacy capitalization over typing based on stale, inaccessible, secure, or ambiguous context. That preserves output and responsiveness across editors whose accessibility providers differ.
+The current fallback preserves the recognizer's capitalization and inserts no
+whitespace. This avoids typing based on stale, inaccessible, secure, or
+ambiguous context and avoids inventing indentation.
 
-The repository test suite passed all 70 tests after the change, including continuation casing, sentence boundaries, exact-correction protection, secure-field handling, focus changes, provider errors, timeouts, and busy-probe behavior.
+The repository test suite covers continuation casing, sentence boundaries,
+unknown-context whitespace, exact-correction protection, secure-field handling,
+focus changes, provider errors, timeouts, and busy-probe behavior.
 
 ## Prevention
 
@@ -79,4 +91,3 @@ The repository test suite passed all 70 tests after the change, including contin
 
 - [Guarantee Exact Transcript Corrections Without Partial or Cascading Rewrites](../logic-errors/deterministic-exact-transcript-corrections.md) documents the literal-output contract preserved by insertion preparation.
 - [Bound Correction Learning to Confirmed Direct Edits](../design-patterns/bound-correction-learning-to-confirmed-direct-edits.md) uses the same cancel-don't-guess approach for cross-application focus state.
-

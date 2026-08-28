@@ -58,6 +58,12 @@ class InsertionPolicyTests(unittest.TestCase):
                     ("", "\nNext topic."),
                 )
 
+    def test_unknown_context_never_invents_leading_whitespace(self):
+        self.assertEqual(
+            prepare_text_for_insertion("Hello again.", None),
+            ("", "Hello again."),
+        )
+
     def test_exactly_corrected_initial_text_can_be_protected(self):
         self.assertEqual(
             prepare_text_for_insertion(

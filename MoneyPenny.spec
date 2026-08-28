@@ -4,6 +4,8 @@ from PyInstaller.utils.hooks import collect_data_files
 
 
 datas = collect_data_files("customtkinter")
+datas += collect_data_files("uiautomation")
+datas += collect_data_files("faster_whisper")
 datas += [
     ("moneypenny.ico", "."),
     ("moneypenny icon.png", "."),

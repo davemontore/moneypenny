@@ -50,6 +50,9 @@ corrections.json
 # Private captured-transcript history
 transcript_history.jsonl
 
+# Private opt-in punctuation test audio and transcripts
+punctuation_lab/
+
 # Legacy file (encryption removed in v2.2+); kept ignored so it isn't re-committed
 encryption.key
 

@@ -4,6 +4,9 @@
 *Released: August 25, 2026*
 
 ### Current Changes
+- Added Deepgram Nova-3 as a cloud provider with native dictation commands, automatic punctuation, smart formatting, and dictionary keyterms
+- Added an opt-in Punctuation Lab that saves one local WAV, compares it across every configured cloud engine, records raw output, MoneyPenny-formatted output, errors, and latency, and never types while testing
+- Deepgram output is treated as already command-aware, so MoneyPenny does not reinterpret literal phrases such as `the words new paragraph` a second time
 - Added opt-out correction recognition: immediate Backspace-and-retype edits within 10 seconds produce a confirm-before-save exact-correction suggestion
 - Correction recognition is limited to the same focused control, cancels on mouse/navigation/window changes, skips detectable secure fields, and never suppresses user input
 - Correction confirmations now appear without restoring the tray-hidden settings window
@@ -13,7 +16,13 @@
 - Clicking a MoneyPenny shortcut while the app is already running now restores and focuses the existing GUI instead of showing an "already running" dialog
 - Split the Dictionary into soft preferred-vocabulary hints and deterministic exact corrections
 - Added local heard-as → type-as rules with whole-phrase matching, longest-match priority, and exact output casing/symbols
-- Added narrow local repair for impossible punctuation collisions such as `:.` and `,?`
+- Added narrow local repair for impossible punctuation collisions such as `:.`, `,:`, `.:`, and `,?`
+- Removed automatic leading spaces when caret context is unavailable
+- Temporarily disabled caret-aware lowercase continuation after browser message fields exposed surrounding application text as if it were editor content; transcription capitalization is preserved until target-aware validation is implemented
+- Made `new paragraph` insert a blank line while `new line` remains one safe Shift+Enter break
+- Removed recognizer-added punctuation attached to spoken commands and protected literal discussion such as `the words new paragraph`
+- Changed Windows builds to stage program files separately so rebuilding preserves API keys, settings, dictionary entries, corrections, logs, and transcript history
+- Packaged the native UI Automation libraries and local speech engine assets required at runtime
 - Added regression coverage and a durable multi-session upgrade plan
 - Known limitation: dense coding-oriented punctuation remains a pre-public hardening target and should not yet be treated as production-ready
 

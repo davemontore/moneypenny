@@ -6,14 +6,15 @@
 
 - **Hold‑to‑record**: Press and hold RIGHT CTRL, release to transcribe
 - **Types into any app**: Output is typed into the focused window
-- **Cloud or local transcription**: Cloud mode (Groq or OpenRouter) is fast and accurate; Local mode (faster-whisper) works offline. Choose in the Settings tab.
+- **Cloud or local transcription**: Cloud mode supports Groq, OpenRouter, and Deepgram Nova-3; Local mode (faster-whisper) works offline. Choose in the Settings tab.
+- **Repeatable punctuation testing**: Punctuation Lab sends one saved recording to every configured cloud engine, records comparable outputs and latency, and types nothing while the lab is enabled.
 - **Spoken punctuation under active hardening**: Common commands and paired quotations run locally, but dense coding-oriented punctuation is not yet reliable enough for a public release
 - **Settings window + system tray**: A GUI with Settings, Dictionary, History, and Status tabs. Closing the window hides it to the tray so it keeps listening.
 - **Single-instance window restore**: Launching MoneyPenny again restores and focuses the existing window instead of opening a duplicate or an informational dialog.
 - **Preferred vocabulary and exact corrections**: Bias uncommon terminology, or guarantee local replacements such as `Whisper Flow` → `Wispr Flow` and `C sharp` → `C#`
 - **Correction recognition**: Immediately Backspace and retype the end of a new transcript; MoneyPenny asks whether to learn the change as an exact correction
 - **Captured transcript history**: Review raw and cleaned transcripts locally in the History tab
-- **Spoken punctuation**: Say commands such as `comma`, `question mark`, `new line` (a safe Shift+Enter break; say it twice for a blank line), or `quote ... end quote`; see the reference in the Dictionary tab
+- **Spoken punctuation**: Say commands such as `comma`, `question mark`, `new line` (one safe Shift+Enter break), `new paragraph` (a blank line), or `quote ... end quote`; see the reference in the Dictionary tab
 - **Quick exit**: Press Ctrl+Alt+Q, or right-click the tray icon → Exit
 
 ## Public-readiness status
@@ -49,6 +50,7 @@ This route needs only Windows 10/11 and a microphone—Python is already include
 
 1. In MoneyPenny, choose how to transcribe:
    - **Cloud mode (recommended, fastest)**: Get a free API key at `console.groq.com`, then in the app's Settings tab set Transcription Mode = Cloud, Provider = Groq, paste the key, and click Save Settings
+   - **Cloud mode with native dictation commands**: Create a Deepgram API key, set Provider = Deepgram, paste the key, keep model `nova-3`, and click Save Settings
    - **Local mode (offline)**: No setup needed — the speech model downloads automatically on first run (takes a minute), then it's ready
 
 2. Use it:
@@ -56,9 +58,9 @@ This route needs only Windows 10/11 and a microphone—Python is already include
    - Hold RIGHT CTRL to dictate
    - Release to transcribe; text will be typed automatically
    - For quoted text, say `quote this is quoted quote` or `open quote this is quoted end quote`; MoneyPenny types `"this is quoted"`
-   - For a line break, say `new line`, `newline`, or `new paragraph`; all use safe Shift+Enter and never submit a chat message. Say the command twice for a blank line.
-- When discussing punctuation itself, use natural context such as `the word comma` or `a comma`
-- For coding, review punctuation before executing or submitting dictated code; coding-oriented punctuation remains under active hardening
+   - Say `new line` or `newline` for one safe Shift+Enter break. Say `new paragraph` for two safe breaks with a blank line between paragraphs. Neither command submits a chat message.
+   - When discussing punctuation itself, use natural context such as `the word comma`, `a comma`, or `the words new paragraph`
+   - For coding, review punctuation before executing or submitting dictated code; coding-oriented punctuation remains under active hardening
    - Note: closing the window does NOT quit the app — it hides to the tray. To quit: Ctrl+Alt+Q or right-click the tray icon → Exit
 
 ### Start automatically at login
@@ -75,7 +77,8 @@ Keep only one MoneyPenny shortcut in the Startup folder. Remove it whenever you 
 All settings live in the app's **Settings tab** (double‑click the tray icon to open the window):
 
 - **Transcription Mode**: Cloud (fast, needs internet + API key) or Local (offline, slower)
-- **Cloud Provider**: Groq (usually fastest) or OpenRouter, with separate API key and model fields for each
+- **Cloud Provider**: Groq (usually fastest), OpenRouter, or Deepgram Nova-3, with separate API key and model fields
+- **Punctuation Lab**: Opt-in test mode. Each hotkey recording is saved under `punctuation_lab`, sent to every cloud engine whose key is configured, and logged to `results.jsonl`. MoneyPenny does not type while this is enabled. The requests consume provider credits.
 - **AI Transcript Cleanup**: Local commands do not need AI. `Commands only` (default) invokes `openai/gpt-oss-20b` only for remaining likely verbal punctuation; `Off` never invokes it and `Always` cleans every transcript
 - **Correction Recognition**: Enabled by default for this trial. It watches only the same focused text control for 10 seconds after dictation and asks before saving any rule. Disable it independently in Settings.
 - **Local Model**: `tiny.en` (fastest) or `base.en` (more accurate) — used in Local mode

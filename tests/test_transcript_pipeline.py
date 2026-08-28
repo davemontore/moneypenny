@@ -11,11 +11,13 @@ from voice_to_text import (
     CorrectionTracker,
     ExactCorrections,
     MoneyPennyApp,
+    PunctuationLab,
     Settings,
     TranscriptCleaner,
     TranscriptHistory,
     Transcriber,
     _get_text_before_caret,
+    format_transcript_for_provider,
     apply_spoken_punctuation,
     normalize_punctuation_collisions,
     prepare_text_for_insertion,
@@ -193,6 +195,14 @@ class ExactCorrectionsTests(unittest.TestCase):
 
 
 class PunctuationNormalizationTests(unittest.TestCase):
+    def test_deepgram_native_dictation_is_not_reparsed_as_spoken_commands(self):
+        text = "Use the words new paragraph in this sentence."
+
+        formatted, commands = format_transcript_for_provider(text, "deepgram")
+
+        self.assertEqual(formatted, text)
+        self.assertEqual(commands, [])
+
     def test_user_reported_end_quote_case(self):
         text, applied = apply_spoken_punctuation(
             "The quotation feature where I quote use it to do something like "
@@ -222,8 +232,21 @@ class PunctuationNormalizationTests(unittest.TestCase):
             "First comma second period new paragraph Is this right question mark"
         )
 
-        self.assertEqual(text, "First, second.\nIs this right?")
+        self.assertEqual(text, "First, second.\n\nIs this right?")
         self.assertEqual(len(applied), 4)
+
+    def test_line_and_paragraph_commands_have_distinct_break_counts(self):
+        cases = {
+            "new line": "\n",
+            "New line.": "\n",
+            "new paragraph": "\n\n",
+            "New paragraph.": "\n\n",
+        }
+        for raw, expected in cases.items():
+            with self.subTest(raw=raw):
+                text, applied = apply_spoken_punctuation(raw)
+                self.assertEqual(text, expected)
+                self.assertEqual(len(applied), 1)
 
     def test_punctuation_inside_quotes_and_terminal_mark(self):
         text, _ = apply_spoken_punctuation(
@@ -242,6 +265,9 @@ class PunctuationNormalizationTests(unittest.TestCase):
     def test_literal_punctuation_references_are_preserved(self):
         cases = (
             "I used the word comma in context.",
+            "I should say the words new paragraph in a sentence.",
+            "When I hit new paragraph, it moves down.",
+            "When I press new paragraph, it moves down.",
             "Add a colon.",
             "This was meant to end with a colon.",
             "Say colon when discussing the command.",
@@ -263,6 +289,13 @@ class PunctuationNormalizationTests(unittest.TestCase):
             normalize_punctuation_collisions("He sent me this:."),
             "He sent me this:",
         )
+
+    def test_spoken_colon_supersedes_automatic_mark_before_command(self):
+        for raw in ("Here is the link, colon.", "Here is the link. colon."):
+            with self.subTest(raw=raw):
+                text, applied = apply_spoken_punctuation(raw)
+                self.assertEqual(text, "Here is the link:")
+                self.assertEqual(len(applied), 1)
 
     def test_terminal_mark_supersedes_adjacent_comma(self):
         self.assertEqual(
@@ -360,6 +393,7 @@ class TranscriptCleanerTests(unittest.TestCase):
         prompt = TranscriptCleaner.SYSTEM_PROMPT
         self.assertIn("new line", prompt)
         self.assertIn("newline character", prompt)
+        self.assertIn('"new paragraph" inserts two newline characters', prompt)
         self.assertIn("inside a closing quotation mark", prompt)
         self.assertIn('"hello,"', prompt)
         self.assertIn("end quote", prompt)
@@ -373,7 +407,7 @@ class TranscriptCleanerTests(unittest.TestCase):
         self.assertTrue(line_used)
         self.assertTrue(paragraph_used)
         self.assertEqual(new_line, "\n")
-        self.assertEqual(new_paragraph, "\n")
+        self.assertEqual(new_paragraph, "\n\n")
 
     def test_local_edge_break_survives_cleanup_fast_path(self):
         with patch("voice_to_text.requests.post") as post:
@@ -396,8 +430,12 @@ class TranscriptCleanerTests(unittest.TestCase):
 
     def test_model_break_clusters_and_quote_spacing_are_normalized(self):
         self.assertEqual(
+            self.cleaner._normalize_model_breaks("First\n\n\nSecond"),
+            "First\n\nSecond",
+        )
+        self.assertEqual(
             self.cleaner._normalize_model_breaks("First\n\nSecond"),
-            "First\nSecond",
+            "First\n\nSecond",
         )
         self.assertEqual(
             self.cleaner._tighten_quote_spacing('He said " hello " today'),
@@ -478,12 +516,6 @@ class InsertionPreparationTests(unittest.TestCase):
                     prepare_text_for_insertion(transcript, context),
                     expected,
                 )
-
-    def test_unknown_context_preserves_legacy_behavior(self):
-        self.assertEqual(
-            prepare_text_for_insertion("Hello again.", None),
-            (" ", "Hello again."),
-        )
 
     def test_acronyms_mixed_case_names_and_pronoun_i_are_preserved(self):
         cases = ("NASA launched.", "OpenAI responded.", "I'm ready.")
@@ -596,7 +628,7 @@ class InsertionPreparationTests(unittest.TestCase):
         self.assertLess(events.index("type"), events.index("history"))
         self.assertLess(events.index("arm"), events.index("history"))
 
-    def test_unknown_context_keeps_legacy_prefix_and_capitalization_in_pipeline(self):
+    def test_unknown_context_keeps_capitalization_without_leading_whitespace(self):
         app = MoneyPennyApp.__new__(MoneyPennyApp)
         app.frames_lock = __import__("threading").Lock()
         app.audio_frames = [b"audio"]
@@ -620,7 +652,42 @@ class InsertionPreparationTests(unittest.TestCase):
         with patch("voice_to_text._get_text_before_caret", return_value=None):
             app._transcribe_and_type_locked()
 
-        app.keyboard_controller.type.assert_called_once_with(" Hello again.")
+        app.keyboard_controller.type.assert_called_once_with("Hello again.")
+
+    def test_deepgram_commands_mode_skips_second_cleanup_pass(self):
+        app = MoneyPennyApp.__new__(MoneyPennyApp)
+        app.frames_lock = __import__("threading").Lock()
+        app.audio_frames = [b"audio"]
+        app.transcriber = Mock()
+        app.transcriber.transcribe.return_value = (
+            "Use the words new paragraph in this sentence."
+        )
+        app.transcriber.last_error = None
+        app.corrections = Mock()
+        app.corrections.apply.side_effect = lambda text: (text, [])
+        app.cleaner = Mock()
+        app.cleaner.should_clean.return_value = True
+        app.cleaner.last_error = None
+        app.history = Mock()
+        app.settings = FakeSettings(
+            transcription_mode="cloud",
+            cloud_provider="deepgram",
+            cleanup_mode="commands",
+        )
+        app.keyboard_controller = MagicMock()
+        app._notify_history = Mock()
+        app._notify_status = Mock()
+        app._wait_for_modifiers_release = Mock()
+        app._arm_correction_recognition = Mock()
+
+        with patch("voice_to_text._get_text_before_caret", return_value=None):
+            app._transcribe_and_type_locked()
+
+        app.cleaner.should_clean.assert_not_called()
+        app.cleaner.clean.assert_not_called()
+        app.keyboard_controller.type.assert_called_once_with(
+            "Use the words new paragraph in this sentence."
+        )
 
 
 class CaretContextTests(unittest.TestCase):
@@ -644,6 +711,7 @@ class CaretContextTests(unittest.TestCase):
         )
 
         with (
+            patch("voice_to_text.CARET_CONTEXT_ENABLED", True),
             patch.dict(sys.modules, {"uiautomation": auto}),
             patch(
                 "voice_to_text._get_keyboard_focus_context",
@@ -665,6 +733,11 @@ class CaretContextTests(unittest.TestCase):
             -64,
             waitTime=0,
         )
+
+    def test_runtime_caret_context_is_disabled_until_targets_are_verified(self):
+        with patch("voice_to_text._caret_context_probe.read") as read:
+            self.assertIsNone(_get_text_before_caret(max_chars=64))
+        read.assert_not_called()
 
 
 class TranscriptHistoryTests(unittest.TestCase):
@@ -703,6 +776,86 @@ class TranscriptHistoryTests(unittest.TestCase):
 
 
 class CloudTranscriptionErrorTests(unittest.TestCase):
+    def test_deepgram_uses_nova_dictation_with_exact_wav_bytes(self):
+        settings = FakeSettings(
+            cloud_provider="deepgram",
+            deepgram_api_key="deepgram-test-key",
+            deepgram_model="nova-3",
+        )
+        lexicon = Mock()
+        lexicon.terms = ["MoneyPenny", "Montore"]
+        transcriber = Transcriber(settings, lexicon)
+        response = Mock(status_code=200, text="ok")
+        response.json.return_value = {
+            "results": {
+                "channels": [
+                    {"alternatives": [{"transcript": "First line.\n\nSecond line."}]}
+                ]
+            }
+        }
+
+        with patch("voice_to_text.requests.post", return_value=response) as post:
+            result = transcriber._transcribe_cloud(io.BytesIO(b"exact wav bytes"))
+
+        self.assertEqual(result, "First line.\n\nSecond line.")
+        post.assert_called_once()
+        call = post.call_args
+        self.assertEqual(call.args[0], "https://api.deepgram.com/v1/listen")
+        self.assertEqual(call.kwargs["data"].getvalue(), b"exact wav bytes")
+        self.assertEqual(
+            call.kwargs["headers"],
+            {
+                "Authorization": "Token deepgram-test-key",
+                "Content-Type": "audio/wav",
+            },
+        )
+        self.assertEqual(
+            call.kwargs["params"],
+            {
+                "model": "nova-3",
+                "language": "en-US",
+                "dictation": "true",
+                "punctuate": "true",
+                "smart_format": "true",
+                "keyterm": ["MoneyPenny", "Montore"],
+            },
+        )
+
+    def test_missing_deepgram_key_is_exposed_to_the_app(self):
+        settings = FakeSettings(
+            cloud_provider="deepgram",
+            deepgram_api_key="",
+        )
+        transcriber = Transcriber(settings, Mock())
+
+        result = transcriber._transcribe_cloud(io.BytesIO(b"audio"))
+
+        self.assertEqual(result, "")
+        self.assertEqual(
+            transcriber.last_error,
+            "Add a Deepgram API key in Settings or switch to Local mode.",
+        )
+
+    def test_deepgram_rejected_api_key_is_exposed_to_the_app(self):
+        transcriber = Transcriber(Mock(), Mock())
+        response = Mock(status_code=401, text='{"error":"invalid key"}')
+
+        with (
+            patch("voice_to_text.requests.post", return_value=response),
+            patch("voice_to_text.logger.error"),
+        ):
+            result = transcriber._deepgram_request(
+                io.BytesIO(b"audio"),
+                api_key="not-a-real-key",
+                model="nova-3",
+            )
+
+        self.assertEqual(result, "")
+        self.assertEqual(
+            transcriber.last_error,
+            "Deepgram rejected the API key. Check it in Settings.",
+        )
+
     def test_rejected_api_key_is_exposed_to_the_app(self):
         settings = Mock()
         lexicon = Mock()
@@ -785,6 +938,178 @@ class CloudTranscriptionErrorTests(unittest.TestCase):
 
         self.assertEqual(post.call_count, 2)
         self.assertEqual(result, "recovered transcript")
+
+    def test_rate_limit_honors_bounded_retry_after(self):
+        settings = Mock()
+        lexicon = Mock()
+        lexicon.get_prompt.return_value = ""
+        transcriber = Transcriber(settings, lexicon)
+        limited = Mock(
+            status_code=429,
+            text="rate limited",
+            headers={"Retry-After": "1.5"},
+        )
+        success = Mock(status_code=200)
+        success.json.return_value = {"text": "recovered transcript"}
+
+        with (
+            patch("voice_to_text.requests.post", side_effect=[limited, success]) as post,
+            patch("voice_to_text.logger.error"),
+            patch("voice_to_text.time.sleep") as sleep,
+        ):
+            result = transcriber._cloud_request(
+                io.BytesIO(b"audio"),
+                url="https://example.invalid/transcriptions",
+                api_key="key",
+                model="test-model",
+                extra_headers={},
+                provider_name="Groq",
+            )
+
+        self.assertEqual(post.call_count, 2)
+        sleep.assert_called_once_with(1.5)
+        self.assertEqual(result, "recovered transcript")
+
+
+class PunctuationLabTests(unittest.TestCase):
+    def test_lab_mode_compares_saved_wav_and_never_types(self):
+        app = MoneyPennyApp.__new__(MoneyPennyApp)
+        app.frames_lock = __import__("threading").Lock()
+        app.audio_frames = [b"audio"]
+        wav_buffer = io.BytesIO(b"one exact wav")
+        app.transcriber = Mock()
+        app.transcriber._frames_to_wav.return_value = wav_buffer
+        app.punctuation_lab = Mock()
+        app.punctuation_lab.run.return_value = {
+            "run_id": "test-run",
+            "candidates": [{"provider": "deepgram"}, {"provider": "groq"}],
+        }
+        app.settings = FakeSettings(punctuation_lab_enabled=True)
+        app.keyboard_controller = MagicMock()
+        app._notify_status = Mock()
+
+        app._transcribe_and_type_locked()
+
+        app.transcriber._frames_to_wav.assert_called_once_with([b"audio"])
+        app.punctuation_lab.run.assert_called_once_with(wav_buffer)
+        app.transcriber.transcribe.assert_not_called()
+        app.keyboard_controller.type.assert_not_called()
+        app._notify_status.assert_called_once_with(
+            "idle",
+            "Punctuation Lab saved 2 comparisons. Nothing was typed.",
+        )
+
+    def test_lab_mode_with_no_configured_key_reports_error_and_never_types(self):
+        app = MoneyPennyApp.__new__(MoneyPennyApp)
+        app.frames_lock = __import__("threading").Lock()
+        app.audio_frames = [b"audio"]
+        app.transcriber = Mock()
+        app.transcriber._frames_to_wav.return_value = io.BytesIO(b"wav")
+        app.punctuation_lab = Mock()
+        app.punctuation_lab.run.return_value = {
+            "run_id": "empty-run",
+            "candidates": [],
+        }
+        app.settings = FakeSettings(punctuation_lab_enabled=True)
+        app.keyboard_controller = MagicMock()
+        app._notify_status = Mock()
+
+        app._transcribe_and_type_locked()
+
+        app.keyboard_controller.type.assert_not_called()
+        app._notify_status.assert_called_once_with(
+            "error",
+            "Punctuation Lab needs at least one configured cloud API key.",
+        )
+
+    def test_lab_failure_reports_error_and_never_types(self):
+        app = MoneyPennyApp.__new__(MoneyPennyApp)
+        app.frames_lock = __import__("threading").Lock()
+        app.audio_frames = [b"audio"]
+        app.transcriber = Mock()
+        app.transcriber._frames_to_wav.return_value = io.BytesIO(b"wav")
+        app.punctuation_lab = Mock()
+        app.punctuation_lab.run.side_effect = OSError("disk unavailable")
+        app.settings = FakeSettings(punctuation_lab_enabled=True)
+        app.keyboard_controller = MagicMock()
+        app._notify_status = Mock()
+
+        with patch("voice_to_text.logger.exception"):
+            app._transcribe_and_type_locked()
+
+        app.keyboard_controller.type.assert_not_called()
+        app._notify_status.assert_called_once_with(
+            "error",
+            "Punctuation Lab failed. Check the Status tab or log for details.",
+        )
+
+    def test_no_configured_candidates_do_not_persist_audio(self):
+        settings = FakeSettings()
+        transcriber = Mock()
+        transcriber.lexicon = Mock()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            lab = PunctuationLab(settings, transcriber, Path(temp_dir))
+            report = lab.run(io.BytesIO(b"private wav"))
+
+            self.assertEqual(report["candidates"], [])
+            self.assertIsNone(report["audio_file"])
+            self.assertEqual(list(Path(temp_dir).rglob("*.wav")), [])
+            self.assertFalse((Path(temp_dir) / "results.jsonl").exists())
+
+    def test_one_wav_is_saved_and_compared_without_secrets(self):
+        settings = FakeSettings(
+            groq_api_key="groq-secret",
+            openrouter_api_key="openrouter-secret",
+            cloud_model="openai/gpt-transcribe",
+            deepgram_api_key="deepgram-secret",
+            deepgram_model="nova-3",
+        )
+        transcriber = Mock()
+        transcriber.lexicon = Mock()
+        outputs = {
+            ("groq", "whisper-large-v3-turbo"): "First sentence period",
+            ("groq", "whisper-large-v3"): "First sentence.",
+            ("openrouter", "openai/gpt-transcribe"): "First sentence period",
+            ("deepgram", "nova-3"): "First sentence.",
+        }
+
+        def transcribe_candidate(candidate_transcriber, wav_buffer, provider, model):
+            self.assertEqual(wav_buffer.read(), b"one exact wav")
+            candidate_transcriber.last_error = None
+            return outputs[(provider, model)]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            lab = PunctuationLab(settings, transcriber, Path(temp_dir))
+            with patch.object(
+                Transcriber,
+                "transcribe_cloud_candidate",
+                autospec=True,
+                side_effect=transcribe_candidate,
+            ):
+                report = lab.run(io.BytesIO(b"one exact wav"))
+
+            audio_path = Path(temp_dir) / report["audio_file"]
+            self.assertEqual(audio_path.read_bytes(), b"one exact wav")
+            lines = (Path(temp_dir) / "results.jsonl").read_text(
+                encoding="utf-8"
+            ).splitlines()
+            self.assertEqual(len(lines), 1)
+            persisted = json.loads(lines[0])
+
+        self.assertEqual(len(report["candidates"]), 4)
+        self.assertEqual(
+            [candidate["provider"] for candidate in report["candidates"]],
+            ["groq", "groq", "openrouter", "deepgram"],
+        )
+        self.assertEqual(
+            report["candidates"][0]["formatted"],
+            "First sentence.",
+        )
+        serialized = json.dumps(persisted)
+        self.assertNotIn("groq-secret", serialized)
+        self.assertNotIn("openrouter-secret", serialized)
+        self.assertNotIn("deepgram-secret", serialized)
 
 
 if __name__ == "__main__":

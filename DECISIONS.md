@@ -4,6 +4,47 @@ Significant project decisions, with date, reason, and practical consequence.
 
 ---
 
+## 2026-08-27: Test punctuation providers with identical recorded audio
+
+**Decision:** Add Deepgram Nova-3 as a native dictation provider and add an
+opt-in Punctuation Lab. A lab run packages the microphone frames once, saves
+that exact WAV locally, sends the same bytes to each configured cloud
+candidate, and records raw text, provider-aware deterministic formatting,
+latency, and errors. Lab runs do not type into the focused application.
+
+**Reason:** Repeating a phrase live for different engines changes the audio and
+cannot isolate recognition errors from MoneyPenny formatting errors. Deepgram's
+native dictation mode also provides a mature command interpretation path worth
+measuring directly instead of reproducing every ambiguity in local rules.
+
+**Practical consequence:** A user can compare Groq Turbo, Groq Large V3,
+OpenRouter's configured transcription model, and Deepgram Nova-3 from one
+utterance. Deepgram transcripts bypass MoneyPenny's spoken-command parser so
+literal command phrases are not interpreted twice. The lab is explicit because
+it stores sensitive audio locally and consumes provider credits.
+
+---
+
+## 2026-08-27: Paragraph commands create visual paragraph spacing
+
+**Decision:** `new line` and `newline` produce one safe Shift+Enter break.
+`new paragraph` produces two safe Shift+Enter breaks so the next paragraph has
+a blank line above it. Recognizer-added punctuation attached to a command is
+discarded, while contextual phrases that explicitly discuss a command remain
+literal text.
+
+**Reason:** A paragraph boundary and a line break are different writing
+operations. Mapping both to one break forced users to repeat the paragraph
+command, and automatic punctuation could survive immediately before or after
+the requested symbol or paragraph break. The parser also needs to distinguish commands from
+phrases such as `the words new paragraph`.
+
+**Practical consequence:** Paragraphs receive visual separation without using
+bare Enter, which could submit a chat-style input. `new line` remains available
+for a single soft break.
+
+---
+
 ## 2026-08-26 — Coding punctuation is a public-release gate
 
 **Decision:** Keep MoneyPenny pre-public until spoken punctuation is reliable
@@ -60,6 +101,9 @@ https://console.groq.com/docs/models
 ---
 
 ## 2026-08-13 — One universal line break; never type bare Enter
+
+**Status:** Superseded on August 27, 2026 by distinct `new line` and
+`new paragraph` behavior. The prohibition on bare Enter remains in force.
 
 **Decision:** `new line`, `newline`, and `new paragraph` all produce the same
 soft line break typed as Shift+Enter. MoneyPenny never types a bare Enter. Say
