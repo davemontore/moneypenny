@@ -12,12 +12,7 @@
     "memory": "8gb",
     "storage": "32gb"
   },
-  "containerEnv": {
-    "DISPLAY": ":99",
-    "PYNPUT_BACKEND": "xorg"
-  },
-  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y portaudio19-dev python3-tk xvfb && python -m venv .venv && .venv/bin/python -m pip install --upgrade pip && .venv/bin/python -m pip install -r .devcontainer/requirements-linux.txt",
-  "postStartCommand": "pgrep Xvfb >/dev/null || nohup Xvfb :99 -screen 0 1024x768x24 >/tmp/moneypenny-xvfb.log 2>&1 &",
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y portaudio19-dev python3-tk xvfb && python -m venv .venv && .venv/bin/python -m pip install --upgrade pip && .venv/bin/python -m pip install -r .devcontainer/requirements-linux.txt && bash .devcontainer/run-tests.sh",
   "customizations": {
     "vscode": {
       "extensions": [
