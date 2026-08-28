@@ -1,11 +1,6 @@
 {
   "name": "Moneypenny",
-  "image": "mcr.microsoft.com/devcontainers/universal:2",
-  "features": {
-    "ghcr.io/devcontainers/features/python:1": {
-      "version": "3.12"
-    }
-  },
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
   "hostRequirements": {
     "cpus": 2,
     "memory": "8gb",
